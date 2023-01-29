@@ -1,0 +1,8 @@
+## Title: Crafting
+## Interface: 100002
+## Dependencies: Math, TradeSkillMaster, Object, Array, Coroutine, String, Events, Boolean, CraftSim
+## SavedVariables: CraftingSavedVariables
+## SavedVariablesPerCharacter: CraftingSavedVariablesPerCharacter
+
+CraftAndSellInAH.lua
+Plan.lua
