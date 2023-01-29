@@ -6,7 +6,7 @@ Highly automated and optimized crafting of any amount of items.
 
 ## Dependencies
 
-The following add-ons are also required to be installed in order for the add-on to work.
+The following add-ons are also required to be installed in order for the add-on to work:
 
 * [Math](https://github.com/SanjoSolutions/LuaMath)
 * [Object](https://github.com/SanjoSolutions/LuaObject)
