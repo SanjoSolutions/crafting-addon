@@ -721,17 +721,14 @@ function _.retrieveRecipeOutputItemData(recipeID, quality)
 end
 
 function _.loadItem(itemID)
-  print('load item')
   local item = Item:CreateFromItemID(itemID)
   if not item:IsItemDataCached() then
     local thread = coroutine.running()
 
     item:ContinueOnItemLoad(function()
-      print('resume')
       Coroutine.resumeWithShowingError(thread)
     end)
 
-    print('')
     coroutine.yield()
   end
 end
