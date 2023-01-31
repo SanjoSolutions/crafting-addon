@@ -349,8 +349,8 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
         return TSM_API.GetBagQuantity(itemString) + TSM_API.GetBankQuantity(itemString) + TSM_API.GetReagentBankQuantity(itemString)
       end)), 0)
   end)
-  thingsToRetrieve = Array.filter(thingsToRetrieve, function(thingToBuy)
-    return thingToBuy.amount >= 1
+  thingsToRetrieve = Array.filter(thingsToRetrieve, function(thingToRetrieve)
+    return thingToRetrieve.amount >= 1
   end)
 
   local inventory = {
@@ -586,13 +586,28 @@ function AddOn.scanRecipes()
       categoryID = recipeInfo.categoryID,
       profession = professionInfo.profession,
       skillLineAbilityID = recipeInfo.skillLineAbilityID,
-      craftedItemIDs = craftedItemIDs
+      craftedItemIDs = craftedItemIDs,
+      recipeInfo = recipeInfo
     }
 
     Array.forEach(craftedItemIDs, function(itemID)
       CraftingSavedVariables.itemIDToRecipeID[itemID] = recipeID
     end)
   end
+end
+
+function _.retrieveCachedRecipeInfo(recipeID)
+	local recipe = _.retrieveRecipeForRecipeID(recipeID)
+  if recipe then
+    return recipe.recipeInfo
+  else
+    return nil
+  end
+end
+
+local retrieveRecipeInfo = C_TradeSkillUI.GetRecipeInfo
+C_TradeSkillUI.GetRecipeInfo = function (recipeID, recipeLevel)
+  return retrieveRecipeInfo(recipeID, recipeLevel) or _.retrieveCachedRecipeInfo(recipeID)
 end
 
 function _.retrieveCraftedItemIDs(recipeID)
