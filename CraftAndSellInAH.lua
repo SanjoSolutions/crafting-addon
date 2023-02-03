@@ -273,6 +273,17 @@ local toCraftAndSellInAH = {
   },
 }
 
+function CraftAndSellInAH.doIt()
+  Coroutine.runAsCoroutineImmediately(function()
+    local thingsToCraft = _.determineThingsToCraft()
+    local thingsToRetrieve = _.retrieveMaterialsForThingsToCraft(thingsToCraft)
+    _.craftThings(thingsToCraft)
+
+    local text = AddOn.generateThingsToRetrieveText(thingsToRetrieve) .. '\n' .. _.generateThingsToCraftText(thingsToCraft)
+    _.showText(text)
+  end)
+end
+
 AddOn.SourceType = {
   NPCVendor = 1,
   Crafting = 2,
