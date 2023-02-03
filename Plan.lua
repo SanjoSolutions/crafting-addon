@@ -34,7 +34,7 @@ planButton:SetScript('OnClick', function()
     amount = craftingPage.CreateMultipleInputBox:GetValue()
   }
   table.insert(CraftingSavedVariablesPerCharacter.plan, item)
-  _.render()
+  Coroutine.runAsCoroutineImmediately(_.render)
 end)
 
 craftingPage.CreateButton:SetPoint('RIGHT', planButton, 'LEFT', -30)
@@ -81,7 +81,7 @@ function _.main()
     local isPriceDataLoaded = Boolean.toBoolean(TSM_API.GetCustomPriceValue('DBMarket', 'i:190396'))
     if isPriceDataLoaded then
       ticker:Cancel()
-      _.render()
+      Coroutine.runAsCoroutine(_.render)
     end
   end)
 end
