@@ -3,6 +3,10 @@ local addOnName = select(1, ...)
 local AddOn = select(2, ...)
 local _ = {}
 
+local Array = Library.retrieve('Array', '^2.1.0')
+local Boolean = Library.retrieve('Boolean', '^2.0.0')
+local Coroutine = Library.retrieve('Coroutine', '^2.0.0')
+
 local craftingPage = ProfessionsFrame.CraftingPage
 
 local craftingPlanDisplay = ChatFrame4

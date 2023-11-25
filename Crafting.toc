@@ -1,8 +1,20 @@
 ## Title: Crafting
 ## Interface: 100002
-## Dependencies: Math, TradeSkillMaster, Object, Array, Coroutine, String, Events, Boolean, CraftSim
+## Dependencies: TradeSkillMaster, CraftSim
 ## SavedVariables: CraftingSavedVariables
 ## SavedVariablesPerCharacter: CraftingSavedVariablesPerCharacter
+
+node_modules\@sanjo-addons\library\Library.xml
+
+node_modules\@sanjo-addons\array\Array.xml
+node_modules\@sanjo-addons\boolean\Boolean.xml
+node_modules\@sanjo-addons\coroutine\Coroutine.xml
+node_modules\@sanjo-addons\float\Float.xml
+node_modules\@sanjo-addons\function\Function.xml
+node_modules\@sanjo-addons\mathematics\Mathematics.xml
+node_modules\@sanjo-addons\object\Object.xml
+node_modules\@sanjo-addons\set\Set.xml
+node_modules\@sanjo-addons\string\String.xml
 
 CraftAndSellInAH.lua
 Plan.lua

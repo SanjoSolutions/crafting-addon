@@ -3,6 +3,13 @@ CraftAndSellInAH = {}
 local AddOn = select(2, ...)
 local _ = {}
 
+local Array = Library.retrieve('Array', '^2.1.0')
+local Coroutine = Library.retrieve('Coroutine', '^2.0.0')
+local Mathematics = Library.retrieve('Mathematics', '^2.0.1')
+local Object = Library.retrieve('Object', '^1.1.0')
+local Set = Library.retrieve('Set', '^1.1.1')
+local String = Library.retrieve('String', '^2.0.1')
+
 -- highest quality all
 
 --TSM_API.GetBagQuantity('i:198243::i346')
@@ -353,7 +360,7 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
     --thingToRetrieve.itemIDs = Set.create(Array.select(thingToRetrieve.itemIDs:toList(), function(itemID)
     --  return _.canBeCraftedForALowerPriceThanSoldInTheAuctionHouse(thingToRetrieve, Set.create({ itemID }))
     --end))
-    thingToRetrieve.amount = math.max(thingToRetrieve.amount - Math.sum(Array.map(thingToRetrieve.itemIDs:toList(),
+    thingToRetrieve.amount = math.max(thingToRetrieve.amount - Mathematics.sum(Array.map(thingToRetrieve.itemIDs:toList(),
       function(id)
         local itemString = _.generateItemString({ id = id, level = thingToRetrieve.level })
         -- Reagents from those sources can directly be used for crafting.
@@ -436,10 +443,10 @@ function _.determineThingsToRetrieveForThing(thingToCraft)
     recipeID = thingToCraft.recipeID
   }
   Array.forEach(thingsRequiredForThing, function(thingRequiredForThing)
-    local itemIDs = Set.create(Array.select(thingRequiredForThing.itemIDs:toList(), function(itemID)
+    local itemIDs = Set.create(Array.selectTrue(thingRequiredForThing.itemIDs:toList(), function(itemID)
       return _.canBeCraftedForALowerPriceThanSoldInTheAuctionHouse(item, Set.create({ itemID }))
     end))
-    local amount = math.max(thingRequiredForThing.amount - Math.sum(Array.map(itemIDs:toList(),
+    local amount = math.max(thingRequiredForThing.amount - Mathematics.sum(Array.map(itemIDs:toList(),
       function(id)
         local itemString = _.generateItemString({ id = id, level = thingRequiredForThing.level })
         -- Reagents from those sources can directly be used for crafting.
@@ -766,7 +773,7 @@ end
 function AddOn.showText(chatFrame, text)
   chatFrame:Clear()
 
-  local lines = String.splitLines(text)
+  local lines = String.split('\n', text)
   Array.forEach(lines, function(line)
     chatFrame:AddMessage(line)
   end)
@@ -777,7 +784,7 @@ function _.determineCraftingCost(item, preferredReagents)
     local thingsRequired = _.determineThingsRequiredPerThing(item)
     local averageAmountProduced = _.determineAverageAmountProduced(item)
     if averageAmountProduced then
-      return Math.sum(Array.map(thingsRequired, function(thing)
+      return Mathematics.sum(Array.map(thingsRequired, function(thing)
         local itemID
         if preferredReagents then
           itemID = Array.find(thing.itemIDs:toList(), function(itemID)

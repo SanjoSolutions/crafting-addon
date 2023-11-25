@@ -1,0 +1,15 @@
+{
+  "version": "0.0.0",
+  "dependencies": {
+    "@sanjo-addons/array": "^2.1.0",
+    "@sanjo-addons/boolean": "^2.0.0",
+    "@sanjo-addons/coroutine": "^2.0.0",
+    "@sanjo-addons/mathematics": "^2.0.1",
+    "@sanjo-addons/object": "^1.1.0",
+    "@sanjo-addons/set": "^1.1.1",
+    "@sanjo-addons/string": "^2.0.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
