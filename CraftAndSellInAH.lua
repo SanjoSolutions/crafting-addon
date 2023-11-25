@@ -1,6 +1,7 @@
 CraftAndSellInAH = {}
 --- @class AddOn
 local AddOn = select(2, ...)
+--- @class _
 local _ = {}
 
 local Array = Library.retrieve('Array', '^2.1.0')
@@ -29,7 +30,8 @@ local toCraftAndSellInAH = {
     name = "Draconium Delver's Helmet",
     level = 346,
     recipeID = 382392,
-    amount = 10
+    amount = 10,
+    quality = 3
   },
   {
     id = 194125,
@@ -38,14 +40,16 @@ local toCraftAndSellInAH = {
     missive = "Draconic Missive of Inspiration",
     missiveIDs = Set.create({ 198534, 198535, 198536 }),
     recipeID = 382396,
-    amount = 10
+    amount = 10,
+    quality = 3
   },
   {
     id = 198225,
     name = "Draconium Fisherfriend",
     level = 346,
     recipeID = 382394,
-    amount = 10
+    amount = 10,
+    quality = 3
   },
   {
     id = 198234,
@@ -54,21 +58,24 @@ local toCraftAndSellInAH = {
     missive = "Draconic Missive of Inspiration",
     missiveIDs = Set.create({ 198534, 198535, 198536 }),
     recipeID = 382395,
-    amount = 10
+    amount = 10,
+    quality = 3
   },
   {
     id = 198262,
     name = "Bottomless Stonecrust Ore Satchel",
     level = 346,
     recipeID = 382393,
-    amount = 10
+    amount = 10,
+    quality = 3
   },
   {
     id = 198204,
     name = "Draconium Brainwave Amplifier",
     level = 346,
     recipeID = 382398,
-    amount = 10
+    amount = 10,
+    quality = 3
   },
   --{
   --  id = 198255,
@@ -346,7 +353,17 @@ function _.canBeCraftedForALowerPriceThanSoldInTheAuctionHouse(item, preferredRe
   ---- local priceData =
   --return CraftSim.CALC:getMeanProfit(recipeData, priceData) > 0
   local itemString = _.generateItemString(item)
-  return TSM_API.GetCustomPriceValue('DBRecent', itemString) * 0.95 > _.determineCraftingCost(item, preferredReagents)
+  local ahPrice = TSM_API.GetCustomPriceValue('DBRecent', itemString)
+  if ahPrice == nil then
+    ahPrice = TSM_API.GetCustomPriceValue('DBMarket', itemString)
+    if ahPrice == nil then
+      _.loadItem(item.id)
+      print('No auction house price found for item ' .. select(2, GetItemInfo(item.id)) .. ' (' .. itemString .. ').')
+      return false
+    end
+  end
+  local craftingCost = _.determineCraftingCost(item, preferredReagents)
+  return ahPrice * 0.95 > craftingCost
 end
 
 function _.retrieveMaterialsForThingsToCraft(thingsToCraft)
@@ -475,7 +492,6 @@ end
 function _.determineQualityOfItem(itemID)
   _.loadItem(itemID)
   local itemLink = select(2, GetItemInfo(itemID))
-  print(itemLink)
   local qualityString = string.match(itemLink, 'Professions-ChatIcon-Quality-Tier(%d)')
   local quality
   if qualityString then
@@ -815,50 +831,8 @@ end
 function _.determineAverageAmountProduced(item)
   local recipe = _.retrieveRecipeForItem(item.id)
   if recipe then
-    local recipeSchematic = C_TradeSkillUI.GetRecipeSchematic(recipe.recipeID, false)
-    local baseAmount = (recipeSchematic.quantityMin + recipeSchematic.quantityMax) / 2
-    local multicraftExtraItemsFactor = _.determineMulticraftExtraItemsFactor(recipe)
-    local averageExtraAmountFromMulticraftProc = (1 + (2.5 * baseAmount) * multicraftExtraItemsFactor) / 2
-    local averageAmount = baseAmount + averageExtraAmountFromMulticraftProc
-
-    return averageAmount
-  else
-    return nil
-  end
-end
-
-function _.determineMulticraftExtraItemsFactor(recipe)
-  local recipeData = _.createCraftSimRecipeData(recipe)
-  if recipeData then
-    if CraftSim.UTIL:IsSpecImplemented(recipeData.professionID) then
-      recipeData.specNodeData = CraftSim.DATAEXPORT:exportSpecNodeData(recipeData)
-      local rulesNodes = CraftSim.SPEC_DATA.RULE_NODES()[recipeData.professionID]
-      local stats = CraftSim.SPEC_DATA:GetStatsFromSpecNodeData(recipeData, rulesNodes)
-      return stats.multicraft.bonusItemsFactor
-    else
-      local extraItemFactors = CraftSim.SPEC_DATA:GetSpecExtraItemFactorsByRecipeData(recipeData)
-      return extraItemFactors.multicraftExtraItemsFactor
-    end
-  else
-    return nil
-  end
-end
-
-function _.createCraftSimRecipeData(recipe)
-  local craftedItemIDs = recipe.craftedItemIDs
-  local itemID = craftedItemIDs[1]
-  if itemID then
-    local subclassID = select(7, GetItemInfoInstant(itemID))
-    local recipeData = {
-      professionID = recipe.profession,
-      professionInfo = {
-        skillLineID = recipe.skillLineAbilityID
-      },
-      recipeID = recipe.recipeID,
-      categoryID = recipe.categoryID,
-      subtypeID = subclassID,
-    }
-    return recipeData
+    local recipeData = CraftSim.RecipeData(recipe.recipeID, false, false)
+    return CraftSim.CALC:GetExpectedItemAmountMulticraft(recipeData)
   else
     return nil
   end
@@ -873,6 +847,9 @@ function AddOn.determineBestSourcesToRetrieveThingFrom(inventory, thingToRetriev
   --   other characters
   local itemIDs = thingToRetrieve.itemIDs:toList()
   local amountLeft = thingToRetrieve.amount
+  Array.map(itemIDs, function (itemID)
+    _.loadItem(itemID)
+  end)
   table.sort(itemIDs, _.compareQuality)
 
   local function retrieveFromSource(itemID, source)
