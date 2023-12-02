@@ -1,303 +1,42 @@
 CraftAndSellInAH = {}
+
 --- @class AddOn
 local AddOn = select(2, ...)
 --- @class _
 local _ = {}
 
-local Array = Library.retrieve('Array', '^2.1.0')
-local Coroutine = Library.retrieve('Coroutine', '^2.0.0')
-local Mathematics = Library.retrieve('Mathematics', '^2.0.1')
-local Object = Library.retrieve('Object', '^1.1.0')
-local Set = Library.retrieve('Set', '^1.1.1')
-local String = Library.retrieve('String', '^2.0.1')
+--- @type Array
+local Array = Library.retrieve("Array", "^2.1.0")
+--- @type Coroutine
+local Coroutine = Library.retrieve("Coroutine", "^2.0.0")
+--- @type Mathematics
+local Mathematics = Library.retrieve("Mathematics", "^2.0.1")
+--- @type Object
+local Object = Library.retrieve("Object", "^1.1.0")
+--- @type Set
+local Set = Library.retrieve("Set", "^1.1.1")
+--- @type String
+local String = Library.retrieve("String", "^2.0.1")
 
--- highest quality all
+--- @alias ItemLink string
+--- @alias RecipeID number
+--- @alias Amount number
 
---TSM_API.GetBagQuantity('i:198243::i346')
---TSM_API.GetBagQuantity('i:198243')
--- /dump C_TradeSkillUI.GetRecipeSchematic(382392, false)
--- /dump C_TradeSkillUI.GetRecipeSchematic(ProfessionsFrame.CraftingPage.SchematicForm.currentRecipeInfo.recipeID, false)
+--- @class ThingToCraft
+--- @field itemLink ItemLink
+--- @field recipeID RecipeID
+--- @field amount Amount
 
--- /dump CraftAndSellInAH._.determineAmountInInventory('i:198186')
--- /dump TSM_API.GetGuildQuantity('i:198186')
+--- @class Craft
+--- @field recipeID RecipeID
+--- @field amount Amount
+--- @field recipeData RecipeData
 
-CraftAndSellInAH._ = _
+--- @class ThingToRetrieve
+--- @field itemLinks Set
+--- @field amount number
 
-local toCraftAndSellInAH = {
-  -- Engineering
-  {
-    id = 198243,
-    name = "Draconium Delver's Helmet",
-    level = 346,
-    recipeID = 382392,
-    amount = 10,
-    quality = 3
-  },
-  {
-    id = 194125,
-    name = "Spring-Loaded Draconium Fabric Cutters",
-    level = 346,
-    missive = "Draconic Missive of Inspiration",
-    missiveIDs = Set.create({ 198534, 198535, 198536 }),
-    recipeID = 382396,
-    amount = 10,
-    quality = 3
-  },
-  {
-    id = 198225,
-    name = "Draconium Fisherfriend",
-    level = 346,
-    recipeID = 382394,
-    amount = 10,
-    quality = 3
-  },
-  {
-    id = 198234,
-    name = "Lapidary's Draconium Clamps",
-    level = 346,
-    missive = "Draconic Missive of Inspiration",
-    missiveIDs = Set.create({ 198534, 198535, 198536 }),
-    recipeID = 382395,
-    amount = 10,
-    quality = 3
-  },
-  {
-    id = 198262,
-    name = "Bottomless Stonecrust Ore Satchel",
-    level = 346,
-    recipeID = 382393,
-    amount = 10,
-    quality = 3
-  },
-  {
-    id = 198204,
-    name = "Draconium Brainwave Amplifier",
-    level = 346,
-    recipeID = 382398,
-    amount = 10,
-    quality = 3
-  },
-  --{
-  --  id = 198255,
-  --  name = "Calibrated Safety Switch",
-  --  recipeID = 382350,
-  --  amount = 5,
-  --  quality = 3
-  --},
-  {
-    id = 198197,
-    recipeID = 382379,
-    amount = 250
-  },
-
-  -- Blacksmithing
-  {
-    id = 194541,
-    name = "Prototype Regal Barding Framework",
-    recipeID = 377280,
-    amount = 1
-  },
-  {
-    id = 194542,
-    name = "Prototype Explorer's Barding Framework",
-    recipeID = 377281,
-    amount = 1
-  },
-  {
-    id = 193609,
-    name = "Crimson Combatant's Draconium Armguards",
-    level = 343,
-    missiveIDs = Set.create({ 194567, 194568, 194566 }),
-    recipeID = 376617,
-    amount = 10
-  },
-  {
-    id = 193603,
-    name = "Crimson Combatant's Draconium Sabatons",
-    level = 343,
-    missiveIDs = Set.create({ 194567, 194568, 194566 }),
-    recipeID = 376623,
-    amount = 10
-  },
-  {
-    id = 201952,
-    name = "Explorer's Expert Spaulders",
-    level = 343,
-    missiveIDs = Set.create({ 194567, 194568, 194566 }),
-    recipeID = 395880,
-    amount = 10
-  },
-  {
-    id = 193605,
-    name = "Crimson Combatant's Draconium Helm",
-    level = 343,
-    missiveIDs = Set.create({ 194567, 194568, 194566 }),
-    recipeID = 376621,
-    amount = 10
-  },
-  {
-    id = 191242,
-    name = "Draconium Pickaxe",
-    level = 346,
-    missiveIDs = Set.create({ 200577, 200578, 200579 }),
-    recipeID = 371309,
-    amount = 10
-  },
-  {
-    id = 190484,
-    name = "Draconium Sword",
-    level = 343,
-    missiveIDs = Set.create({ 194567, 194568, 194566 }),
-    recipeID = 367599,
-    amount = 10
-  },
-  {
-    id = 191236,
-    name = "Draconium Leatherworker's Toolset",
-    level = 346,
-    recipeID = 371360,
-    amount = 10
-  },
-  {
-    id = 201322,
-    name = "Draconium Defender",
-    level = 343,
-    missiveIDs = Set.create({ 194567, 194568, 194566 }),
-    recipeID = 393404,
-    amount = 10
-  },
-  {
-    id = 191240,
-    name = "Draconium Skinning Knife",
-    level = 346,
-    missive = "Draconic Missive of Perception",
-    missiveIDs = Set.create({ 200577, 200578, 200579 }),
-    recipeID = 371304,
-    amount = 10
-  },
-  {
-    id = 201955,
-    name = "Explorer's Expert Clasp",
-    level = 343,
-    missiveIDs = Set.create({ 194567, 194568, 194566 }),
-    recipeID = 367611,
-    amount = 10
-  },
-  {
-    id = 190485,
-    name = "Draconium Knuckles",
-    level = 343,
-    missive = "Draconic Missive of Peerless",
-    missiveIDs = Set.create({ 194579, 194580, 194578 }),
-    recipeID = 367595,
-    amount = 10
-  },
-  --{
-  --  id = 190487,
-  --  name = "Draconium Axe",
-  --  level = 343,
-  --  missiveIDs = Set.create({ 194567, 194568, 194566 }),
-  --  recipeID = 367600
-  --},
-  --{
-  --  id = 189538,
-  --  name = "Explorer's Plate Chestguard",
-  --  level = 316,
-  --  missiveIDs = Set.create({ 194567, 194568, 194566 }),
-  --  recipeID = 395886
-  --},
-  --{
-  --  id = 189537,
-  --  name = "Explorer's Plate Boots",
-  --  level = 316,
-  --  missiveIDs = Set.create({ 194567, 194568, 194566 }),
-  --  recipeID = 367610
-  --},
-  {
-    id = 193602,
-    name = "Crimson Combatant's Draconium Breastplate",
-    level = 343,
-    missiveIDs = Set.create({ 194567, 194568, 194566 }),
-    recipeID = 376618,
-    amount = 10
-  },
-  --{
-  --  id = 201324,
-  --  name = "Draconium Great Axe",
-  --  level = 343,
-  --  missiveIDs = Set.create({ 194567, 194568, 194566 }),
-  --  recipeID = 393416
-  --},
-  {
-    id = 191241,
-    name = "Draconium Sickle",
-    level = 346,
-    missive = "Draconic Missive of Perception",
-    missiveIDs = Set.create({ 200577, 200578, 200579 }),
-    recipeID = 371343,
-    amount = 10
-  },
-  {
-    id = 191238,
-    name = "Draconium Leatherworker's Knife",
-    level = 346,
-    missive = "Draconic Missive of Inspiration",
-    missiveIDs = Set.create({ 198534, 198535, 198536 }),
-    recipeID = 371338,
-    amount = 10
-  },
-  {
-    id = 190483,
-    name = "Draconium Dirk",
-    level = 343,
-    missive = "Draconic Missive of the Quickblade",
-    missiveIDs = Set.create({ 194573, 194574, 194572 }),
-    recipeID = 367596,
-    amount = 10
-  },
-  {
-    id = 190482,
-    name = "Draconium Stiletto",
-    level = 343,
-    missive = "Draconic Missive of the Quickblade",
-    missiveIDs = Set.create({ 194573, 194574, 194572 }),
-    recipeID = 367597,
-    amount = 10
-  },
-  {
-    id = 201953,
-    name = "Explorer's Expert Gauntlets",
-    level = 343,
-    missiveIDs = Set.create({ 194567, 194568, 194566 }),
-    recipeID = 395879,
-    amount = 10
-  },
-  {
-    id = 191304,
-    name = "Sturdy Expedition Shovel",
-    recipeID = 388279,
-    amount = 100,
-  },
-  {
-    id = 191235,
-    name = "Draconium Blacksmith's Toolbox",
-    level = 346,
-    recipeID = 371364,
-    amount = 10
-  },
-}
-
-function CraftAndSellInAH.doIt()
-  Coroutine.runAsCoroutineImmediately(function()
-    local thingsToCraft = _.determineThingsToCraft()
-    local thingsToRetrieve = _.retrieveMaterialsForThingsToCraft(thingsToCraft)
-    _.craftThings(thingsToCraft)
-
-    local text = AddOn.generateThingsToRetrieveText(thingsToRetrieve) .. '\n' .. _.generateThingsToCraftText(thingsToCraft)
-    _.showText(text)
-  end)
-end
-
+--- @enum SourceType
 AddOn.SourceType = {
   NPCVendor = 1,
   Crafting = 2,
@@ -305,125 +44,228 @@ AddOn.SourceType = {
   GuildBank = 4,
   OtherCharacter = 5,
   Mail = 6,
-  Otherwise = 7
+  Otherwise = 7,
+  Bag = 8,
+  Bank = 9,
+  ReagentBank = 10,
 }
+
+--- @class ItemRetrievalEntry
+--- @field itemLink ItemLink
+--- @field amount Amount
+
+--- @alias BestSources { [SourceType]: ItemRetrievalEntry[] }
+
+--- @alias Groups { [SourceType]: { [ItemLink]: ThingToRetrieve } }
+
+--- @alias Inventory { [SourceType]: { [ItemLink]: number } }
+
+--- @alias Retrieval { [SourceType]: number }
+
+--- @alias ThingsToRetrieveStepsList ThingsToRetrieveStep[]
+
+--- @class ThingsToRetrieveStep
+--- @field source SourceType
+--- @field thingsToRetrieveFromSource
+
+--- @enum Profession
+AddOn.Profession = {
+  -- TODO
+}
+
+--- @alias GroupedThingsToCraft { [Profession]: Craft[] }
+
+CraftAndSellInAH._ = _
 
 local sourceTypeToName = {
-  [AddOn.SourceType.NPCVendor] = 'NPC vendor',
-  [AddOn.SourceType.Crafting] = 'Crafting',
-  [AddOn.SourceType.AuctionHouse] = 'Auction house',
-  [AddOn.SourceType.GuildBank] = 'Guild bank',
-  [AddOn.SourceType.OtherCharacter] = 'Other character',
-  [AddOn.SourceType.Mail] = 'Mail',
-  [AddOn.SourceType.Otherwise] = 'Otherwise'
+  [AddOn.SourceType.NPCVendor] = "NPC vendor",
+  [AddOn.SourceType.Crafting] = "crafting",
+  [AddOn.SourceType.AuctionHouse] = "auction house",
+  [AddOn.SourceType.GuildBank] = "guild bank",
+  [AddOn.SourceType.OtherCharacter] = "other character",
+  [AddOn.SourceType.Mail] = "mail",
+  [AddOn.SourceType.Otherwise] = "otherwise",
 }
 
-function AddOn.generateThingsToRetrieveText(thingsToRetrieve)
-  local text = ''
+function AddOn.generatePlanText(input, thingsToRetrieve, groupedThingsToCraft)
+  local text = ""
+
   for __, thingToRetrieve in ipairs(thingsToRetrieve) do
     local sourceType = thingToRetrieve.source
-    local thingsToRetrieveFromSource = thingToRetrieve.thingsToRetrieveFromSource
-    if text ~= '' then
-      text = text .. '\n'
-    end
-    text = text .. AddOn.generateThingsToRetrieveFromSourceText(sourceType, thingsToRetrieveFromSource)
+    local thingsToRetrieveFromSource = thingToRetrieve
+      .thingsToRetrieveFromSource
+    text = text ..
+      AddOn.generateThingsToRetrieveFromSourceText(sourceType,
+        thingsToRetrieveFromSource) .. "\n"
   end
+
+  text = "\n" .. text .. "Craft:\n"
+  Array.create(Object.entries(groupedThingsToCraft)):forEach(
+    function(entry)
+      if CraftingSavedVariables.professions[entry.key] then
+        local professionName = CraftingSavedVariables.professions[entry.key]
+          .parentProfessionName or CraftingSavedVariables.professions[entry.key]
+          .professionName
+        text = text .. professionName .. ":\n"
+      end
+      Array.forEach(entry.value, function(item, index)
+        text = text ..
+          index ..
+          ". " ..
+          item.amount ..
+          " x " ..
+          C_TradeSkillUI.GetRecipeLink(item.recipeID) .. "\n"
+      end)
+    end)
+
   return text
 end
 
-function _.determineThingsToCraft()
-  local thingsToCraft = {}
-  for __, item in ipairs(toCraftAndSellInAH) do
-    local totalAmount = item.amount or 1
-    if _.canBeCraftedForALowerPriceThanSoldInTheAuctionHouse(item) then
-      local itemString = _.generateItemString(item)
-      local amountToCraft = math.max(totalAmount - TSM_API.GetAuctionQuantity(itemString) - _.determineAmountInInventory(itemString),
-        0)
-      if amountToCraft >= 1 then
-        table.insert(thingsToCraft, Object.assign({}, item, { amount = amountToCraft }))
-      end
-    end
-  end
-  return thingsToCraft
-end
-
-function _.canBeCraftedForALowerPriceThanSoldInTheAuctionHouse(item, preferredReagents)
-  --local recipe = _.retrieveRecipeForItem(item.id)
-  --local recipeData = _.createCraftSimRecipeData(recipe)
-  ---- local priceData =
-  --return CraftSim.CALC:getMeanProfit(recipeData, priceData) > 0
-  local itemString = _.generateItemString(item)
-  local ahPrice = TSM_API.GetCustomPriceValue('DBRecent', itemString)
+--- @param item Item
+--- @return number
+function _.determineAuctionHousePrice(item)
+  local itemString = AddOn.generateItemString(item)
+  local ahPrice = TSM_API.GetCustomPriceValue("DBRecent", itemString)
   if ahPrice == nil then
-    ahPrice = TSM_API.GetCustomPriceValue('DBMarket', itemString)
-    if ahPrice == nil then
-      _.loadItem(item.id)
-      print('No auction house price found for item ' .. select(2, GetItemInfo(item.id)) .. ' (' .. itemString .. ').')
-      return false
-    end
+    ahPrice = TSM_API.GetCustomPriceValue("DBMarket", itemString)
   end
-  local craftingCost = _.determineCraftingCost(item, preferredReagents)
-  return ahPrice * 0.95 > craftingCost
+
+  return ahPrice
 end
 
-function _.retrieveMaterialsForThingsToCraft(thingsToCraft)
-  local thingsToRetrieve = AddOn.determineThingsToRetrieve(thingsToCraft)
-  return thingsToRetrieve
-end
-
+--- @param thingsToCraft ThingToCraft[]
+--- @return ThingsToRetrieveStepsList, GroupedThingsToCraft
 function AddOn.determineThingsToRetrieve(thingsToCraft)
-  local thingsToRetrieve = _.determineThingsToRetrieve(thingsToCraft)
-  Array.forEach(thingsToRetrieve, function(thingToRetrieve)
-    --thingToRetrieve.itemIDs = Set.create(Array.select(thingToRetrieve.itemIDs:toList(), function(itemID)
-    --  return _.canBeCraftedForALowerPriceThanSoldInTheAuctionHouse(thingToRetrieve, Set.create({ itemID }))
-    --end))
-    thingToRetrieve.amount = math.max(thingToRetrieve.amount - Mathematics.sum(Array.map(thingToRetrieve.itemIDs:toList(),
-      function(id)
-        local itemString = _.generateItemString({ id = id, level = thingToRetrieve.level })
-        -- Reagents from those sources can directly be used for crafting.
-        return TSM_API.GetBagQuantity(itemString) + TSM_API.GetBankQuantity(itemString) + TSM_API.GetReagentBankQuantity(itemString)
-      end)), 0)
-  end)
-  thingsToRetrieve = Array.filter(thingsToRetrieve, function(thingToRetrieve)
-    return thingToRetrieve.amount >= 1
-  end)
+  thingsToCraft = Array.map(thingsToCraft, Object.copy)
 
+  --- @type Groups
+  local groups = {}
+  --- @type Inventory
   local inventory = {
+    [AddOn.SourceType.Bag] = {},
+    [AddOn.SourceType.Bank] = {},
+    [AddOn.SourceType.ReagentBank] = {},
     [AddOn.SourceType.Mail] = {},
     [AddOn.SourceType.GuildBank] = {},
-    [AddOn.SourceType.OtherCharacter] = {}
+    [AddOn.SourceType.OtherCharacter] = {},
   }
-  Array.forEach(thingsToRetrieve, function(thingToRetrieve)
-    Array.forEach(thingToRetrieve.itemIDs:toList(), function(itemID)
-      if not inventory[AddOn.SourceType.Mail][itemID] then
-        inventory[AddOn.SourceType.Mail][itemID] = 0
-      end
-      local itemString = _.generateItemString({ id = itemID })
-      inventory[AddOn.SourceType.Mail][itemID] = inventory[AddOn.SourceType.Mail][itemID] + TSM_API.GetMailQuantity(itemString)
 
-      if not inventory[AddOn.SourceType.GuildBank][itemID] then
-        inventory[AddOn.SourceType.GuildBank][itemID] = 0
-      end
-      local itemString = _.generateItemString({ id = itemID })
-      inventory[AddOn.SourceType.GuildBank][itemID] = inventory[AddOn.SourceType.GuildBank][itemID] + TSM_API.GetGuildQuantity(itemString)
-
-      -- TODO: Other characters
-    end)
+  Array.forEach(thingsToCraft, function(thingToCraft)
+    _.addItemToInventory(inventory, AddOn.createItem(thingToCraft.itemLink))
   end)
 
-  local groups = {}
-  Array.forEach(thingsToRetrieve, function(thingToRetrieve)
-    local bestSources = AddOn.determineBestSourcesToRetrieveThingFrom(inventory, thingToRetrieve)
-    for source, object in pairs(bestSources) do
+  Array.forEach(thingsToCraft, function(thingToCraft)
+    local itemLink = thingToCraft.itemLink
+    local retrieval = _.retrieveFromInventory(inventory, itemLink,
+      thingToCraft.amount)
+    for source, amount in pairs(retrieval) do
       if not groups[source] then
         groups[source] = {}
       end
-      local item = Object.assign({}, thingToRetrieve, object)
-      item.itemIDs = nil
-      table.insert(groups[source], item)
+      if groups[source][itemLink] then
+        groups[source][itemLink].amount = groups[source][itemLink].amount +
+          amount
+      else
+        groups[source][itemLink] = {
+          amount = amount,
+        }
+      end
     end
+    thingsToCraft.amount = thingToCraft.amount -
+      Mathematics.sum(Object.values(retrieval))
   end)
 
+  --- @type { [RecipeID]: Craft }
+  local crafts = Object.fromEntries(Array.create(Object.values(Array.groupBy(
+      thingsToCraft,
+      function(thingToCraft)
+        return thingToCraft.recipeID
+      end)))
+    :map(function(thingsToCraft)
+      local recipeID = thingsToCraft[1].recipeID
+
+      local recipeData = AddOn.determineRecipeData(recipeID)
+
+      if recipeData then
+        return {
+          key = recipeID,
+          value = {
+            recipeID = recipeID,
+            amount = math.ceil(Array.max(Array.map(thingsToCraft,
+              function(thingToCraft)
+                return thingToCraft.amount
+              end)) / AddOn.determineAverageAmountProducedByRecipe(recipeData)),
+            recipeData = recipeData,
+          },
+        }
+      else
+        return nil
+      end
+    end):selectTrue())
+
+  _.determineRetrievalsForCrafts(_.convertCraftsMapToArray(crafts), groups,
+    inventory)
+
+  while groups[AddOn.SourceType.Crafting] and Array.hasElements(groups[AddOn.SourceType.Crafting]) do
+    --- @type { [RecipeID]: Craft }
+    local furtherCrafts = Object.fromEntries(
+      Object.entries(
+        Array.groupBy(
+          Array.map(
+            groups[AddOn.SourceType.Crafting],
+            function(thingToCraft)
+              local recipeID = CraftingSavedVariables.itemIDToRecipeID
+                [thingToCraft.itemID]
+              return {
+                recipeID = recipeID,
+                amount = thingToCraft.amount,
+              }
+            end
+          ),
+          function(thingToCraft)
+            return thingToCraft.recipeID
+          end
+        )
+      )
+      :map(function(entry)
+        local recipeID = entry.key
+        local thingsToCraft = entry.value
+        local recipeData = AddOn.determineRecipeData(recipeID)
+        return {
+          key = recipeID,
+          value = {
+            recipeID = recipeID,
+            amount = math.ceil(
+              Array.max(
+                Array.map(
+                  thingsToCraft,
+                  function(thingToCraft)
+                    return thingToCraft.amount
+                  end
+                )
+              ) / AddOn.determineAverageAmountProducedByRecipe(recipeData)
+            ),
+          },
+        }
+      end)
+    )
+
+    for recipeID, craft in pairs(furtherCrafts) do
+      if crafts[recipeID] then
+        crafts[recipeID].amount = crafts[recipeID].amount + craft.amount
+      else
+        crafts[recipeID] = craft
+      end
+    end
+    groups[AddOn.SourceType.Crafting] = nil
+    _.determineRetrievalsForCrafts(
+      _.convertCraftsMapToArray(furtherCrafts),
+      groups,
+      inventory
+    )
+  end
+
+  --- @type ThingsToRetrieveStepsList
   local list = {}
 
   local order = {
@@ -433,46 +275,208 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
     AddOn.SourceType.AuctionHouse,
     AddOn.SourceType.OtherCharacter,
     AddOn.SourceType.Otherwise,
-    AddOn.SourceType.Crafting
+    AddOn.SourceType.Crafting,
   }
   Array.forEach(order, function(source)
     if groups[source] then
       table.insert(list, {
         source = source,
-        thingsToRetrieveFromSource = groups[source]
+        thingsToRetrieveFromSource = Object.values(groups[source]),
       })
     end
   end)
 
-  return list
+  --- @type GroupedThingsToCraft
+  local groupedThingsToCraft = Array.groupBy(_.convertCraftsMapToArray(crafts),
+    function(thingToCraft)
+      return CraftingSavedVariablesPerCharacter.recipes[thingToCraft.recipeID]
+        .profession
+    end)
+
+  Array.create(Object.values(groupedThingsToCraft)):forEach(function(
+    thingsToCraft)
+    table.sort(crafts, function(a, b)
+      local thingsRequiredForB = _.determineThingsRequiredPerCraft(b.recipeID)
+      return Array.any(
+        thingsRequiredForB.reagentData.requiredReagents, function(reagent)
+          return _.retrieveRecipeIDForItem(reagent.items[1].item:GetItemID()) ==
+            a.recipeID
+        end)
+    end)
+  end)
+
+  return list, groupedThingsToCraft
 end
 
-function _.determineThingsToRetrieve(thingsToCraft)
-  return _.sum(Array.flatMap(thingsToCraft, _.determineThingsToRetrieveForThing))
+function AddOn.determineRecipeData(recipeID)
+  local recipeData = nil
+
+  local averageProfit
+  local recipeData1
+  do
+    recipeData1 = CraftSim.RecipeData(recipeID, false, false)
+    recipeData1:SetEquippedProfessionGearSet()
+    recipeData1:OptimizeProfit(false)
+    averageProfit = recipeData1:GetAverageProfit()
+  end
+
+  local averageProfitWithInspiration
+  local recipeData2
+  do
+    recipeData2 = CraftSim.RecipeData(recipeID, false, false)
+    recipeData2:SetEquippedProfessionGearSet()
+    recipeData2:OptimizeProfit(true)
+    averageProfitWithInspiration = recipeData2:GetAverageProfit()
+  end
+
+  if averageProfit > 0 or averageProfitWithInspiration > 0 then
+    if averageProfit >= averageProfitWithInspiration then
+      recipeData = recipeData1
+    else
+      recipeData = recipeData2
+    end
+  end
+
+  return recipeData
 end
 
-function _.determineThingsToRetrieveForThing(thingToCraft)
-  local thingsRequiredForThing = _.determineThingsRequiredForThing(thingToCraft)
+--- @param item Item
+function _.addItemToInventory(inventory, item)
+  local itemLink = item:GetItemLink()
+
+  if not inventory[AddOn.SourceType.Bag][itemLink] then
+    local itemString = AddOn.generateItemString(item)
+    inventory[AddOn.SourceType.Bag][itemLink] = TSM_API.GetBagQuantity(
+      itemString)
+  end
+
+  if not inventory[AddOn.SourceType.Bank][item] then
+    local itemString = AddOn.generateItemString(item)
+    inventory[AddOn.SourceType.Bank][item] = TSM_API.GetBankQuantity(
+      itemString)
+  end
+
+  if not inventory[AddOn.SourceType.ReagentBank][item] then
+    local itemString = AddOn.generateItemString(item)
+    inventory[AddOn.SourceType.ReagentBank][item] = TSM_API
+      .GetReagentBankQuantity(
+        itemString)
+  end
+
+  if not inventory[AddOn.SourceType.Mail][item] then
+    local itemString = AddOn.generateItemString(item)
+    inventory[AddOn.SourceType.Mail][item] = TSM_API.GetMailQuantity(
+      itemString)
+  end
+
+  if not inventory[AddOn.SourceType.GuildBank][item] then
+    local itemString = AddOn.generateItemString(item)
+    inventory[AddOn.SourceType.GuildBank][item] = TSM_API.GetGuildQuantity(
+      itemString)
+  end
+
+  -- TODO: Other characters
+end
+
+function _.convertCraftsMapToArray(crafts)
+  return Object.values(crafts)
+end
+
+--- @param crafts Craft[]
+--- @param groups Groups
+--- @param inventory Inventory
+function _.determineRetrievalsForCrafts(crafts, groups, inventory)
+  local thingsToRetrieve = _.determineThingsToRetrieve(crafts)
+  Array.forEach(thingsToRetrieve, function(thingToRetrieve)
+    thingToRetrieve.amount = math.max(
+      thingToRetrieve.amount -
+      Mathematics.sum(Array.map(thingToRetrieve.itemLinks:toList(),
+        function(itemLink)
+          local itemString = AddOn.generateItemString(AddOn.createItem(itemLink))
+          -- Reagents from those sources can directly be used for crafting.
+          return TSM_API.GetBagQuantity(itemString) +
+            TSM_API.GetBankQuantity(itemString) +
+            TSM_API.GetReagentBankQuantity(itemString)
+        end)), 0)
+  end)
+  thingsToRetrieve = Array.filter(thingsToRetrieve, function(thingToRetrieve)
+    return thingToRetrieve.amount >= 1
+  end)
+
+  Array.forEach(thingsToRetrieve, function(thingToRetrieve)
+    Array.forEach(thingToRetrieve.itemLinks:toList(), function(itemLink)
+      _.addItemToInventory(inventory, AddOn.createItem(itemLink))
+    end)
+  end)
+
+  Array.forEach(thingsToRetrieve, function(thingToRetrieve)
+    local bestSources = AddOn.determineBestSourcesToRetrieveThingFrom(inventory,
+      thingToRetrieve)
+    for source, itemRetrievalEntries in pairs(bestSources) do
+      if not groups[source] then
+        groups[source] = {}
+      end
+      Array.forEach(itemRetrievalEntries, function(itemRetrievalEntry)
+        local itemLink = itemRetrievalEntry.itemLink
+        if groups[source][itemLink] then
+          groups[source][itemLink].amount = groups[source][itemLink].amount +
+            itemRetrievalEntry.amount
+        else
+          groups[source][itemLink] = Object.copy(itemRetrievalEntry)
+        end
+      end)
+    end
+  end)
+end
+
+--- @return ThingToRetrieve[]
+function _.determineThingsToRetrieve(crafts)
+  return _.sum(Array.flatMap(crafts, _.determineThingsToRetrieveForCraft))
+end
+
+--- @param craft Craft
+function _.determineThingsToRetrieveForCraft(craft)
+  local thingsRequiredForCraft = _.determineThingsRequiredForCraft(craft)
   local thingsToRetrieveForThing = {}
-  local recipe = _.retrieveRecipeForRecipeID(thingToCraft.recipeID)
-  local item = {
-    id = Array.last(recipe.craftedItemIDs), -- TODO: Determine what quality can be produced.
-    recipeID = thingToCraft.recipeID
-  }
-  Array.forEach(thingsRequiredForThing, function(thingRequiredForThing)
-    local itemIDs = Set.create(Array.selectTrue(thingRequiredForThing.itemIDs:toList(), function(itemID)
-      return _.canBeCraftedForALowerPriceThanSoldInTheAuctionHouse(item, Set.create({ itemID }))
-    end))
-    local amount = math.max(thingRequiredForThing.amount - Mathematics.sum(Array.map(itemIDs:toList(),
-      function(id)
-        local itemString = _.generateItemString({ id = id, level = thingRequiredForThing.level })
-        -- Reagents from those sources can directly be used for crafting.
-        return TSM_API.GetBagQuantity(itemString) + TSM_API.GetBankQuantity(itemString) + TSM_API.GetReagentBankQuantity(itemString)
-      end)), 0)
+
+  Array.forEach(thingsRequiredForCraft, function(thingRequiredForThing)
+    local itemLinks = thingRequiredForThing.itemLinks:toList()
+    local itemsWithPrices = Array.map(itemLinks, function(itemLink)
+      local item = {
+        itemLink = itemLink,
+        price = _.determineAuctionHousePrice(AddOn.createItem(itemLink)),
+      }
+      return item
+    end)
+    if #itemLinks <= 0 then
+      print("f")
+    end
+    if #itemsWithPrices <= 0 then
+      print("g")
+    end
+    local itemWithLowestPrice = Array.min(itemsWithPrices,
+      function(itemWithPrice)
+        return itemWithPrice.price
+      end)
+    local selectedItems = Array.filter(itemsWithPrices, function(itemWithPrice)
+      return itemWithPrice.price <= itemWithLowestPrice.price
+    end)
+    local amount = math.max(
+      thingRequiredForThing.amount - Mathematics.sum(Array.map(selectedItems,
+        function(item)
+          local itemString = AddOn.generateItemString(AddOn.createItem(item
+            .itemLink))
+          -- Reagents from those sources can directly be used for crafting.
+          return TSM_API.GetBagQuantity(itemString) +
+            TSM_API.GetBankQuantity(itemString) +
+            TSM_API.GetReagentBankQuantity(itemString)
+        end)), 0)
     if amount >= 1 then
       local thingToRetrieveForThing = Object.assign({}, thingRequiredForThing, {
-        itemIDs = itemIDs,
-        amount = amount
+        itemLinks = Set.create(Array.map(selectedItems, function(item)
+          return item.itemLink
+        end)),
+        amount = amount,
       })
       table.insert(thingsToRetrieveForThing, thingToRetrieveForThing)
     end
@@ -490,9 +494,9 @@ end
 -- [Serevite Ore |A:Professions-ChatIcon-Quality-Tier2:17:23::1|a]
 
 function _.determineQualityOfItem(itemID)
-  _.loadItem(itemID)
-  local itemLink = select(2, GetItemInfo(itemID))
-  local qualityString = string.match(itemLink, 'Professions-ChatIcon-Quality-Tier(%d)')
+  local itemLink = _.convertItemIDToItemLink(itemID)
+  local qualityString = string.match(itemLink,
+    "Professions-ChatIcon-Quality-Tier(%d)")
   local quality
   if qualityString then
     quality = tonumber(qualityString, 10)
@@ -502,34 +506,42 @@ function _.determineQualityOfItem(itemID)
   return quality
 end
 
-function _.determineThingsRequiredForThing(thingToCraft)
+--- @class ThingRequired
+--- @field amount number
+local ThingRequired = {}
+
+--- @return ThingRequired
+function ThingRequired.create(data)
+  local thingRequired
+  if data then
+    thingRequired = Object.copy(data)
+  else
+    thingRequired = {}
+  end
+  setmetatable(thingRequired, { __index = ThingRequired, })
+  return thingRequired
+end
+
+--- @param craft Craft
+function _.determineThingsRequiredForCraft(craft)
   local thingsRequiredForThing = {}
-  local thingsRequiredPerThing = _.determineThingsRequiredPerThing(thingToCraft)
+  local thingsRequiredPerThing = _.determineThingsRequiredPerCraft(craft)
   Array.forEach(thingsRequiredPerThing, function(thingRequiredPerThing)
-    table.insert(thingsRequiredForThing, Object.assign({}, thingRequiredPerThing, {
-      amount = (thingToCraft.amount or 1) * thingRequiredPerThing.amount
-    }))
+    table.insert(thingsRequiredForThing,
+      Object.assign({}, thingRequiredPerThing, {
+        amount = (craft.amount or 1) * thingRequiredPerThing.amount,
+      }))
   end)
   return thingsRequiredForThing
 end
 
-function _.determineThingsRequiredPerThing(thingToCraft)
-  local recipeID = thingToCraft.recipeID
+--- @param craft Craft
+function _.determineThingsRequiredPerCraft(craft)
+  local recipeID = craft.recipeID
   local recipeSchematic = C_TradeSkillUI.GetRecipeSchematic(recipeID, false)
   local reagentSlotSchematics = recipeSchematic.reagentSlotSchematics
   local thingsToBuy = {}
 
-  -- optimization goal: maximize "average profit / craft"
-  -- options:
-  --  * reach guaranteed
-  --  * reach inspiration breakpoint
-  -- _.determineOptimalWayToCraft(thingToCraft)
-
-  --if thingToCraft.quality then
-  --
-  --elseif thingToCraft.level then
-  --
-  --else
   Array.forEach(reagentSlotSchematics, function(reagentSlotSchematic)
     if reagentSlotSchematic.reagentType == Enum.CraftingReagentType.Basic then
       local itemIDs = Array.map(reagentSlotSchematic.reagents, function(reagent)
@@ -542,27 +554,39 @@ function _.determineThingsRequiredPerThing(thingToCraft)
       else
         recipeID = nil
       end
-      table.insert(thingsToBuy, {
-        recipeID = recipeID,
-        itemIDs = Set.create(itemIDs),
-        amount = reagentSlotSchematic.quantityRequired
-      })
+      local reagent = Array.find(craft.recipeData.reagentData.requiredReagents,
+        function(reagent)
+          return reagent.dataSlotIndex == reagentSlotSchematic.dataSlotIndex
+        end)
+      Array.forEach(reagent.items, function(item)
+        local quantity = item.quantity
+        if quantity > 0 then
+          AddOn.loadItem(item.item)
+          local itemLink = item.item:GetItemLink()
+          print("itemLink", itemLink)
+          table.insert(thingsToBuy, {
+            recipeID = recipeID,
+            itemLinks = Set.create({ itemLink, }),
+            amount = quantity,
+          })
+        end
+      end)
     end
   end)
-  if thingToCraft.missiveIDs then
+  if craft.missiveIDs then
     local recipeID
-    if Array.hasElements(thingToCraft.missiveIDs) then
-      recipeID = _.retrieveRecipeIDForItem(thingToCraft.missiveIDs[1])
+    if Array.hasElements(craft.missiveIDs) then
+      recipeID = _.retrieveRecipeIDForItem(craft.missiveIDs[1])
     else
       recipeID = nil
     end
+    print("d")
     local recipeID = table.insert(thingsToBuy, {
       recipeID = recipeID,
-      itemIDs = thingToCraft.missiveIDs,
-      amount = 1
+      itemLinks = Array.map(craft.missiveIDs, _.convertItemIDToItemLink),
+      amount = 1,
     })
   end
-  --end
 
   return thingsToBuy
 end
@@ -572,30 +596,35 @@ function _.determineOptimalWayToCraft(thingToCraft)
   local gearCombos = CraftSim.TOPGEAR:GetProfessionGearCombinations(isCooking)
   if gearCombos then
     local exportMode = CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER
-    local recipeData = CraftSim.DATAEXPORT:exportRecipeData(thingToCraft.recipeID, exportMode)
+    local recipeData = CraftSim.DATAEXPORT:exportRecipeData(
+      thingToCraft.recipeID, exportMode)
     if recipeData then
       local recipeType = recipeData.recipeType
       local priceData = CraftSim.PRICEDATA:GetPriceData(recipeData, recipeType)
-      local noItemsRecipeData = CraftSim.TOPGEAR:DeductCurrentItemStats(recipeData, recipeType)
-      local simulationResults = _.simulateProfessionGearCombinations(gearCombos, noItemsRecipeData,
+      local noItemsRecipeData = CraftSim.TOPGEAR:DeductCurrentItemStats(
+        recipeData, recipeType)
+      local simulationResults = _.simulateProfessionGearCombinations(gearCombos,
+        noItemsRecipeData,
         recipeType, priceData)
-
     end
   end
 end
 
-function _.simulateProfessionGearCombinations(gearCombos, recipeData, recipeType, priceData)
+function _.simulateProfessionGearCombinations(gearCombos, recipeData, recipeType,
+  priceData)
   local results = {}
 
   for __, gearCombination in pairs(gearCombos) do
-    local statChanges = CraftSim.TOPGEAR:GetStatChangesFromGearCombination(gearCombination)
-    local modifiedRecipeData = CraftSim.TOPGEAR:GetModifiedRecipeDataByStatChanges(recipeData, recipeType, statChanges)
+    local statChanges = CraftSim.TOPGEAR:GetStatChangesFromGearCombination(
+      gearCombination)
+    local modifiedRecipeData = CraftSim.TOPGEAR
+      :GetModifiedRecipeDataByStatChanges(recipeData, recipeType, statChanges)
     -- TODO: Optimize material choices to maximize profit. Seem only relevant if the inspiration stat changes.
     local meanProfit = CraftSim.CALC:getMeanProfit(modifiedRecipeData, priceData)
     table.insert(results, {
       meanProfit = meanProfit,
       combo = gearCombination,
-      modifiedRecipeData = modifiedRecipeData
+      modifiedRecipeData = modifiedRecipeData,
     })
   end
 
@@ -611,27 +640,34 @@ end
 function AddOn.scanRecipes()
   C_TradeSkillUI.GetChildProfessionInfo()
   local professionInfo = C_TradeSkillUI.GetChildProfessionInfo()
-  for __, recipeID in ipairs(C_TradeSkillUI.GetFilteredRecipeIDs()) do
-    local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
-    local craftedItemIDs = _.retrieveCraftedItemIDs(recipeID)
-
-    CraftingSavedVariables.recipes[recipeID] = {
-      recipeID = recipeID,
-      categoryID = recipeInfo.categoryID,
-      profession = professionInfo.profession,
-      skillLineAbilityID = recipeInfo.skillLineAbilityID,
-      craftedItemIDs = craftedItemIDs,
-      recipeInfo = recipeInfo
-    }
-
-    Array.forEach(craftedItemIDs, function(itemID)
-      CraftingSavedVariables.itemIDToRecipeID[itemID] = recipeID
+  local dragonFlightProfessionInfo = Array.find(
+    C_TradeSkillUI.GetChildProfessionInfos(), function(professionInfo)
+      return professionInfo.expansionName == "Dragon Isles"
     end)
+  local professionID = dragonFlightProfessionInfo.professionID
+  for __, recipeID in ipairs(C_TradeSkillUI.GetFilteredRecipeIDs()) do
+    if C_TradeSkillUI.IsRecipeInSkillLine(recipeID, professionID) then
+      local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
+      local craftedItemIDs = _.retrieveCraftedItemIDs(recipeID)
+
+      CraftingSavedVariablesPerCharacter.recipes[recipeID] = {
+        recipeID = recipeID,
+        categoryID = recipeInfo.categoryID,
+        profession = professionInfo.profession,
+        skillLineAbilityID = recipeInfo.skillLineAbilityID,
+        craftedItemIDs = craftedItemIDs,
+        recipeInfo = recipeInfo,
+      }
+
+      Array.forEach(craftedItemIDs, function(itemID)
+        CraftingSavedVariables.itemIDToRecipeID[itemID] = recipeID
+      end)
+    end
   end
 end
 
 function _.retrieveCachedRecipeInfo(recipeID)
-	local recipe = _.retrieveRecipeForRecipeID(recipeID)
+  local recipe = _.retrieveRecipeForRecipeID(recipeID)
   if recipe then
     return recipe.recipeInfo
   else
@@ -640,8 +676,9 @@ function _.retrieveCachedRecipeInfo(recipeID)
 end
 
 local retrieveRecipeInfo = C_TradeSkillUI.GetRecipeInfo
-C_TradeSkillUI.GetRecipeInfo = function (recipeID, recipeLevel)
-  return retrieveRecipeInfo(recipeID, recipeLevel) or _.retrieveCachedRecipeInfo(recipeID)
+C_TradeSkillUI.GetRecipeInfo = function(recipeID, recipeLevel)
+  return retrieveRecipeInfo(recipeID, recipeLevel) or
+    _.retrieveCachedRecipeInfo(recipeID)
 end
 
 function _.retrieveCraftedItemIDs(recipeID)
@@ -652,7 +689,7 @@ function _.retrieveCraftedItemIDs(recipeID)
     local recipeSchematic = C_TradeSkillUI.GetRecipeSchematic(recipeID, false)
     local outputItemID = recipeSchematic.outputItemID
     if outputItemID then
-      return { outputItemID }
+      return { outputItemID, }
     else
       return {}
     end
@@ -669,59 +706,60 @@ function _.retrieveRecipeForItem(itemID)
 end
 
 function _.retrieveRecipeForRecipeID(recipeID)
-	return CraftingSavedVariables.recipes[recipeID]
+  return CraftingSavedVariablesPerCharacter.recipes[recipeID]
 end
 
 function _.retrieveRecipeIDForItem(itemID)
   return CraftingSavedVariables.itemIDToRecipeID[itemID]
 end
 
-function _.sum(thingsToBuy)
-  local totalThingsToBuy = {}
+--- @param thingsToRetrieve ThingToRetrieve[]
+--- @return ThingToRetrieve[]
+function _.sum(thingsToRetrieve)
+  local totalThingsToRetrieve = {}
   local lookup = {}
-  Array.forEach(thingsToBuy, function(thingToBuy)
-    local firstItemID = thingToBuy.itemIDs:toList()[1]
-    local entry = lookup[firstItemID]
+  Array.forEach(thingsToRetrieve, function(thingToBuy)
+    local firstItemLink = thingToBuy.itemLinks:toList()[1]
+    local entry = lookup[firstItemLink]
     if entry then
       entry.amount = entry.amount + thingToBuy.amount
     else
       local entry = Object.copy(thingToBuy)
-      table.insert(totalThingsToBuy, entry)
-      lookup[firstItemID] = entry
+      table.insert(totalThingsToRetrieve, entry)
+      lookup[firstItemLink] = entry
     end
   end)
-  return totalThingsToBuy
+  return totalThingsToRetrieve
 end
 
 function _.craftThings(thingsToCraft)
 
 end
 
-function AddOn.generateThingsToRetrieveFromSourceText(sourceType, thingsToRetrieve)
-  local text = ''
+function AddOn.generateThingsToRetrieveFromSourceText(sourceType,
+  thingsToRetrieve)
+  local text = ""
   if sourceTypeToName[sourceType] then
-    text = text .. sourceTypeToName[sourceType] .. ':'
+    text = text .. "Retrieve from " .. sourceTypeToName[sourceType] .. ":"
     Array.forEach(thingsToRetrieve, function(thingToRetrieve)
-      local itemID = thingToRetrieve.itemID
-      _.loadItem(itemID)
-      local itemLink = select(2, GetItemInfo(itemID))
-      local line = '  ' .. thingToRetrieve.amount .. ' x ' .. itemLink
-      text = text .. '\n' .. line
+      local itemLink = thingToRetrieve.itemLink
+      local line = "  " .. thingToRetrieve.amount .. " x " .. itemLink
+      text = text .. "\n" .. line
     end)
   end
   return text
 end
 
 function _.join(itemLinks)
-  local string = ''
+  local string = ""
   local length = Array.length(itemLinks)
   for index, itemLink in ipairs(itemLinks) do
     if index >= 2 then
       local isLastItem = index == length
       if isLastItem then
-        string = string .. ' or '
+        string = string .. " or "
       else
-        string = string .. ', '
+        string = string .. ", "
       end
     end
 
@@ -731,32 +769,36 @@ function _.join(itemLinks)
 end
 
 function _.determineAmountInInventory(itemString)
-  return TSM_API.GetBagQuantity(itemString) + TSM_API.GetBankQuantity(itemString) + TSM_API.GetReagentBankQuantity(itemString) + TSM_API.GetMailQuantity(itemString) + TSM_API.GetGuildQuantity(itemString)
+  return TSM_API.GetBagQuantity(itemString) + TSM_API.GetBankQuantity(itemString) +
+    TSM_API.GetReagentBankQuantity(itemString) +
+    TSM_API.GetMailQuantity(itemString) + TSM_API.GetGuildQuantity(itemString)
 end
 
-function _.generateItemString(item)
-  local itemString = 'i:' .. item.id
-  if item.level then
-    itemString = itemString .. '::i' .. item.level
+--- @param item Item
+function AddOn.generateItemString(item)
+  local itemString = "i:" .. item:GetItemID()
+  local itemLevel = item:GetCurrentItemLevel()
+  if itemLevel then
+    itemString = itemString .. "::i" .. itemLevel
   end
   return itemString
 end
 
 function _.generateThingsToCraftText(thingsToCraft)
-  local text = 'To craft:\n'
+  local text = "To craft:\n"
   Array.forEach(thingsToCraft, function(thingToCraft)
-    _.loadItem(thingToCraft.id)
-    local line = thingToCraft.amount .. ' x ' .. _.retrieveRecipeOutputItemLink(thingToCraft.recipeID,
-      thingToCraft.quality)
+    AddOn.loadItem(AddOn.createItem(id))
+    local line = thingToCraft.amount ..
+      " x " .. _.retrieveRecipeOutputItemLink(thingToCraft.recipeID,
+        thingToCraft.quality)
     if thingToCraft.missiveIDs then
       local missiveID = thingToCraft.missiveIDs:toList()[1]
       if missiveID then
-        _.loadItem(missiveID)
-        local itemLink = select(2, GetItemInfo(missiveID))
-        line = line .. ' (with ' .. itemLink .. ')'
+        local itemLink = _.convertItemIDToItemLink(missiveID)
+        line = line .. " (with " .. itemLink .. ")"
       end
     end
-    text = text .. line .. '\n'
+    text = text .. line .. "\n"
   end)
   return text
 end
@@ -769,8 +811,8 @@ function _.retrieveRecipeOutputItemData(recipeID, quality)
   return C_TradeSkillUI.GetRecipeOutputItemData(recipeID, nil, nil, 3 + quality)
 end
 
-function _.loadItem(itemID)
-  local item = Item:CreateFromItemID(itemID)
+--- @param item Item
+function AddOn.loadItem(item)
   if not item:IsItemDataCached() then
     local thread = coroutine.running()
 
@@ -782,6 +824,23 @@ function _.loadItem(itemID)
   end
 end
 
+--- @param itemReference number|string|Item Item ID, item link or item object.
+--- @return Item
+function AddOn.createItem(itemReference)
+  local item
+  local itemReferenceType = type(itemReference)
+  if itemReferenceType == "number" then
+    item = Item:CreateFromItemID(itemReference)
+  elseif itemReferenceType == "string" then
+    item = Item:CreateFromItemLink(itemReference)
+  elseif itemReferenceType == "table" then
+    item = itemReference
+  else
+    error("Unsupported type: " .. itemReferenceType)
+  end
+  return item
+end
+
 function _.showText(text)
   AddOn.showText(ChatFrame4, text)
 end
@@ -789,37 +848,23 @@ end
 function AddOn.showText(chatFrame, text)
   chatFrame:Clear()
 
-  local lines = String.split('\n', text)
+  local lines = String.split("\n", text)
   Array.forEach(lines, function(line)
     chatFrame:AddMessage(line)
   end)
 end
 
-function _.determineCraftingCost(item, preferredReagents)
+-- TODO: Sagacious Incense buff (+20 inspiration) when it makes a difference
+function _.determineCraftingCost(item)
   if item.recipeID then
-    local thingsRequired = _.determineThingsRequiredPerThing(item)
-    local averageAmountProduced = _.determineAverageAmountProduced(item)
-    if averageAmountProduced then
-      return Mathematics.sum(Array.map(thingsRequired, function(thing)
-        local itemID
-        if preferredReagents then
-          itemID = Array.find(thing.itemIDs:toList(), function(itemID)
-            return preferredReagents:contains(itemID)
-          end)
-        end
-        if not itemID then
-          itemID = Array.min(thing.itemIDs:toList(), function(itemID)
-            local item = {
-              id = itemID
-            }
-            local itemString = _.generateItemString(item)
-            return TSM_API.GetCustomPriceValue('DBRecent', itemString)
-          end)
-        end
-        local itemString = _.generateItemString({ id = itemID })
-        local price = TSM_API.GetCustomPriceValue('DBRecent', itemString)
-        return thing.amount * price
-      end)) / averageAmountProduced
+    local recipeData = AddOn.determineRecipeData(item.recipeID)
+    local quality = Array.findIndex(recipeData.resultData.itemsByQuality,
+      function(item2)
+        return item2:GetItemLink() == item:GetItemLink()
+      end)
+    if quality and recipeData.resultData.chanceByQuality[quality] > 0 then
+      return recipeData.priceData.craftingCosts *
+        (1 / recipeData.resultData.chanceByQuality[quality])
     else
       return nil
     end
@@ -838,69 +883,112 @@ function _.determineAverageAmountProduced(item)
   end
 end
 
-function AddOn.determineBestSourcesToRetrieveThingFrom(inventory, thingToRetrieve)
-  local bestSources = {}
+--- @param recipeData RecipeData
+function AddOn.determineAverageAmountProducedByRecipe(recipeData)
+  return CraftSim.CALC:GetExpectedItemAmountMulticraft(recipeData)
+end
 
-  -- inventory
-  --   mail
-  --   guild bank
-  --   other characters
-  local itemIDs = thingToRetrieve.itemIDs:toList()
-  local amountLeft = thingToRetrieve.amount
-  Array.map(itemIDs, function (itemID)
-    _.loadItem(itemID)
-  end)
-  table.sort(itemIDs, _.compareQuality)
-
-  local function retrieveFromSource(itemID, source)
-    local amountFromSource = math.min(inventory[source][itemID] or 0, amountLeft)
-    if amountFromSource >= 1 then
-      inventory[source][itemID] = inventory[source][itemID] - amountFromSource
-      bestSources[source] = {
-        itemID = itemID,
-        amount = amountFromSource
-      }
-      amountLeft = amountLeft - amountFromSource
-    end
-  end
+--- @param inventory Inventory
+--- @param itemLink ItemLink
+--- @param amount Amount
+--- @return Retrieval
+function _.retrieveFromInventory(inventory, itemLink, amount)
+  local amountLeft = amount
 
   local inventorySources = {
     AddOn.SourceType.Mail,
     AddOn.SourceType.GuildBank,
-    AddOn.SourceType.OtherCharacter
+    AddOn.SourceType.OtherCharacter,
   }
 
-  for __, itemID in ipairs(itemIDs) do
-    for __, source in ipairs(inventorySources) do
-      retrieveFromSource(itemID, source)
+  --- @type Retrieval
+  local retrieval = {}
+
+  for __, source in ipairs(inventorySources) do
+    local amountFromSource = _.retrieveFromInventoryFromSource(inventory,
+      itemLink,
+      source, amountLeft)
+    if amountFromSource >= 1 then
+      retrieval[source] = amountFromSource
+      amountLeft = amountLeft - amountFromSource
     end
+  end
+
+  return retrieval
+end
+
+--- @param inventory Inventory
+--- @param itemLink ItemLink
+--- @param source SourceType
+--- @param amount Amount
+--- @return Amount
+function _.retrieveFromInventoryFromSource(inventory, itemLink, source, amount)
+  local amountFromSource = math.min(inventory[source][itemLink] or 0, amount)
+  if amountFromSource >= 1 then
+    inventory[source][itemLink] = inventory[source][itemLink] - amountFromSource
+  end
+  return amountFromSource
+end
+
+--- @param inventory Inventory
+--- @param thingToRetrieve ThingToRetrieve
+--- @return BestSources
+function AddOn.determineBestSourcesToRetrieveThingFrom(inventory, thingToRetrieve)
+  --- @type BestSources
+  local bestSources = {}
+
+  local itemLinks = thingToRetrieve.itemLinks:toList()
+  Array.map(itemLinks, function(itemLink)
+    AddOn.loadItem(AddOn.createItem(itemLink))
+  end)
+  table.sort(itemLinks, _.compareQuality)
+
+  local amountLeft = thingToRetrieve.amount
+
+  for __, itemLink in ipairs(itemLinks) do
+    local retrieval = _.retrieveFromInventory(inventory, itemLink, amountLeft)
+
+    for source, amount in pairs(retrieval) do
+      if not bestSources[source] then
+        bestSources[source] = {}
+      end
+      table.insert(bestSources[source], {
+        itemLink = itemLink,
+        amount = amount,
+      })
+    end
+
+    local amountLeft = amountLeft -
+      Mathematics.sum(Object.values(retrieval))
 
     -- other sources
     if amountLeft >= 1 then
+      local item2 = Item:CreateFromItemLink(itemLink)
       local item = {
-        id = itemID,
-        recipeID = _.retrieveRecipeIDForItem(itemID)
+        itemLink = itemLink,
+        recipeID = _.retrieveRecipeIDForItem(itemLink),
       }
-      local npcBuyPrice = _.determineNPCBuyPrice(itemID)
+      local npcBuyPrice = _.determineNPCBuyPrice(itemLink)
       local craftingPrice = _.determineCraftingCost(item)
-      local auctionHouseBuyPrice = _.determineAuctionHouseBuyPrice(item)
+      local auctionHouseBuyPrice = _.determineAuctionHouseBuyPrice(AddOn
+        .createItem(item.itemLink))
       local sources = {}
       if npcBuyPrice then
         table.insert(sources, {
           type = AddOn.SourceType.NPCVendor,
-          price = npcBuyPrice
+          price = npcBuyPrice,
         })
       end
       if craftingPrice then
         table.insert(sources, {
           type = AddOn.SourceType.Crafting,
-          price = craftingPrice
+          price = craftingPrice,
         })
       end
       if auctionHouseBuyPrice then
         table.insert(sources, {
           type = AddOn.SourceType.AuctionHouse,
-          price = auctionHouseBuyPrice
+          price = auctionHouseBuyPrice,
         })
       end
       local lowestPriceSource = Array.min(sources, function(source)
@@ -912,14 +1000,23 @@ function AddOn.determineBestSourcesToRetrieveThingFrom(inventory, thingToRetriev
       else
         source = AddOn.SourceType.Otherwise
       end
-      bestSources[source] = {
-        itemID = itemID,
-        amount = amountLeft
-      }
+      if not bestSources[source] then
+        bestSources[source] = {}
+      end
+      table.insert(bestSources[source], {
+        itemLink = itemLink,
+        amount = amountLeft,
+      })
     end
   end
 
   return bestSources
+end
+
+function _.convertItemIDToItemLink(itemID)
+  local item = AddOn.createItem(itemID)
+  AddOn.loadItem(item)
+  return item:GetItemLink()
 end
 
 function _.compareQuality(a, b)
@@ -941,22 +1038,21 @@ function _.determineNPCBuyPrice(itemID)
 end
 
 function _.determineCraftingPrice(itemID)
-  print('itemID', itemID)
   local recipeID = _.retrieveRecipeIDForItem(itemID)
-
-  print('recipeID', recipeID)
 
   if recipeID then
     local exportMode = CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER
     local recipeData = CraftSim.DATAEXPORT:exportRecipeData(recipeID, exportMode)
-    print('recipeData', recipeData)
     if recipeData then
       local recipeType = recipeData.recipeType
       local priceData = CraftSim.PRICEDATA:GetPriceData(recipeData, recipeType)
-      local statWeights = CraftSim.AVERAGEPROFIT:getProfessionStatWeightsForCurrentRecipe(recipeData, priceData,
-        exportMode)
-      local averageAmountProducedPerCraft = statWeights.craftedItems.baseQuality + statWeights.craftedItems.nextQuality
-      local averageCraftingCostPerCraftedItem = priceData.craftingCostPerCraft / averageAmountProducedPerCraft
+      local statWeights = CraftSim.AVERAGEPROFIT
+        :getProfessionStatWeightsForCurrentRecipe(recipeData, priceData,
+          exportMode)
+      local averageAmountProducedPerCraft = statWeights.craftedItems.baseQuality +
+        statWeights.craftedItems.nextQuality
+      local averageCraftingCostPerCraftedItem = priceData.craftingCostPerCraft /
+        averageAmountProducedPerCraft
       return averageCraftingCostPerCraftedItem
     end
   end
@@ -964,15 +1060,17 @@ function _.determineCraftingPrice(itemID)
   return nil
 end
 
+--- @param item Item
 function _.determineAuctionHouseBuyPrice(item)
-  local itemString = _.generateItemString(item)
-  return TSM_API.GetCustomPriceValue('DBRecent', itemString)
+  local itemString = AddOn.generateItemString(item)
+  return TSM_API.GetCustomPriceValue("DBRecent", itemString)
 end
 
 function _.findRecipesToCraft()
   local allRecipes = _.retrieveAllRecipes()
   local potentialCandidates = Array.filter(allRecipes, function(recipe)
-    return _.isCraftable(recipe) and _.canProducedItemBeSoldInTheAuctionHouse(recipe)
+    return _.isCraftable(recipe) and
+      _.canProducedItemBeSoldInTheAuctionHouse(recipe)
   end)
   local recipesToCraft = {}
   Array.forEach(potentialCandidates, function(potentialCandidate)
@@ -980,7 +1078,7 @@ function _.findRecipesToCraft()
     if _.averageProfitPerCraft(bestConfiguration) > 0 then
       table.insert(recipesToCraft, {
         recipe = potentialCandidate,
-        amount = _.retrieveAverageDailySold(item)
+        amount = _.retrieveAverageDailySold(item),
       })
     end
   end)
