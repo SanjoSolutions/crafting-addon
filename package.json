@@ -6,6 +6,7 @@
   },
   "dependencies": {
     "@sanjo-addons/array": "^2.1.1",
+    "@sanjo-addons/bags": "^2.0.5",
     "@sanjo-addons/boolean": "^2.0.0",
     "@sanjo-addons/coroutine": "^2.0.1",
     "@sanjo-addons/events": "^2.1.0",

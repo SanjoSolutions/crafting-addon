@@ -7,6 +7,8 @@ local _ = {}
 
 --- @type Array
 local Array = Library.retrieve("Array", "^2.1.0")
+--- @type Bags
+local Bags = Library.retrieve("Bags", "^2.0.5")
 --- @type Coroutine
 local Coroutine = Library.retrieve("Coroutine", "^2.0.0")
 --- @type Events
@@ -89,6 +91,10 @@ AddOn.Profession = {
 --- @field itemLink ItemLink
 --- @field amount Amount
 --- @field maximumUnitPriceToBuyFor Money
+
+--- @class SellTask
+--- @field itemLink ItemLink
+--- @field amount Amount
 
 CraftAndSellInAH._ = _
 
@@ -429,7 +435,101 @@ function _.purchase(purchaseTask)
   end
 end
 
+--- @param sellTasks SellTask[]
+AddOn.sell = function(sellTasks)
+  Array.forEach(sellTasks, _.doSellTask)
+  print("Have worked through the full list.")
+end
+
+--- @param sellTask SellTask
+function _.doSellTask(sellTask)
+  local item = AddOn.createItem(sellTask.itemLink)
+  local itemID = item:GetItemID()
+  local amount = sellTask.amount
+
+  local itemKey = { itemID = itemID, }
+  local wasSuccessful, event, argument1
+  while true do
+    C_AuctionHouse.SendSearchQuery(
+      itemKey,
+      sorts,
+      true
+    )
+
+    wasSuccessful, event, argument1 = Events
+      .waitForOneOfEventsAndCondition(
+        { "COMMODITY_SEARCH_RESULTS_UPDATED", "AUCTION_HOUSE_SHOW_ERROR", },
+        function(self, event, argument1)
+          if event == "COMMODITY_SEARCH_RESULTS_UPDATED" then
+            local itemID = argument1
+            return itemID == itemKey.itemID
+          elseif event == "AUCTION_HOUSE_SHOW_ERROR" then
+            return true
+          end
+        end, 3)
+
+    if event == "AUCTION_HOUSE_SHOW_ERROR" and argument1 == 10 then
+      Events.waitForEvent("AUCTION_HOUSE_THROTTLED_SYSTEM_READY")
+    end
+
+    if event ~= "AUCTION_HOUSE_SHOW_ERROR" then
+      break
+    end
+  end
+
+  local unitPrice
+  if event == "COMMODITY_SEARCH_RESULTS_UPDATED" then
+    unitPrice = _.determineUnitPrice(itemID)
+    -- TODO: Handle when unitPrice is nil. (When there is no item of the type in the AH?)
+
+    -- TODO: Make sure that the unit price is high enough so that selling the item for the price is profitable.
+
+    local containerIndex, slotIndex = Bags.findItem(itemID)
+    if containerIndex and slotIndex then
+      local item = ItemLocation:CreateFromBagAndSlot(containerIndex, slotIndex)
+      local duration = 1
+      -- TODO: Does it work if the item is distributed over multiple slots?
+      local itemLink = C_Item.GetItemLink(item)
+      print("Trying to put in " ..
+        amount ..
+        " x " .. itemLink .. " (each for " .. GetMoneyString(unitPrice) .. ").")
+      if MoneyMakingAssistant.showConfirmButton() then
+        local requiresConfirmation = C_AuctionHouse.PostCommodity(item, duration,
+          amount, unitPrice)
+        if requiresConfirmation then
+          C_AuctionHouse.ConfirmPostCommodity(item, duration, amount, unitPrice)
+        end
+        -- TODO: Events for error?
+        local wasSuccessful = Events.waitForEvent(
+          "AUCTION_HOUSE_AUCTION_CREATED", 3)
+        if wasSuccessful then
+          print("Have put in " ..
+            amount ..
+            " x " ..
+            itemLink .. " (each for " .. GetMoneyString(unitPrice) .. ").")
+        else
+          print("Error putting in " .. amount .. " x " .. itemLink .. ".")
+        end
+      end
+    end
+  end
+end
+
+function _.determineUnitPrice(itemID)
+  local numberOfCommoditySearchResults = C_AuctionHouse
+    .GetNumCommoditySearchResults(itemID)
+  if numberOfCommoditySearchResults >= 1 then
+    local result = C_AuctionHouse.GetCommoditySearchResultInfo(itemID, 1)
+    if result then
+      return result.unitPrice
+    end
+  end
+
+  return nil
+end
+
 do
+  -- FIXME
   BINDING_HEADER_MONEY_MAKING = "Money Making"
   local prefix = "Money Making: "
   BINDING_NAME_MONEY_MAKING_CONFIRM_BUTTON = prefix .. "Confirm"

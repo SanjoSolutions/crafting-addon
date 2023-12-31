@@ -77,7 +77,6 @@ local buyButton = CreateFrame("Button", nil,
   "UIPanelButtonTemplate")
 buyButton:SetSize(80, 22)
 buyButton:SetTextToFit("Buy")
-buyButton:SetPoint("BOTTOMRIGHT", -5, 3)
 buyButton:SetScript("OnClick", function()
   Coroutine.runAsCoroutineImmediately(function()
     local thingsToRetrieveFromAH = Array.find(thingsToRetrieve,
@@ -98,6 +97,35 @@ buyButton:SetScript("OnClick", function()
     AddOn.buy(buyTasks)
   end)
 end)
+
+local sellButton = CreateFrame("Button", nil,
+  AuctionHouseFrame,
+  "UIPanelButtonTemplate")
+sellButton:SetSize(80, 22)
+sellButton:SetTextToFit("Sell")
+sellButton:SetPoint("BOTTOMRIGHT", -5, 3)
+sellButton:SetScript("OnClick", function()
+  Coroutine.runAsCoroutineImmediately(function()
+    local sellTasks = Array.map(CraftingSavedVariablesPerCharacter.plan,
+        function(thingToCraft)
+          local item = AddOn.createItem(thingToCraft.itemLink)
+          AddOn.loadItem(item)
+          local itemString = AddOn.generateItemString(item)
+          local bagQuantity = TSM_API.GetBagQuantity(itemString)
+          local amount = min(thingToCraft.amount, bagQuantity)
+          return {
+            itemLink = thingToCraft.itemLink,
+            amount = amount,
+          }
+        end)
+      :filter(function(sellTask)
+        return sellTask.amount >= 1
+      end)
+    AddOn.sell(sellTasks)
+  end)
+end)
+
+buyButton:SetPoint("RIGHT", sellButton, "LEFT", -2, 0)
 
 function _.findRecipesToCraft()
   CraftingSavedVariablesPerCharacter.plan = {}
@@ -125,6 +153,7 @@ function _.findRecipesToCraft()
                 local amountToCraft = Mathematics.round(amountSoldPerDay / 24 *
                   window)
                 if amountToCraft > 0 then
+                  --- @type ThingToCraft
                   local item = {
                     itemLink = item:GetItemLink(),
                     recipeID = recipe.recipeID,
@@ -325,6 +354,7 @@ function _.initializeSavedVariables()
     CraftingSavedVariablesPerCharacter = {}
   end
   if not CraftingSavedVariablesPerCharacter.plan then
+    --- @type ThingToCraft[]
     CraftingSavedVariablesPerCharacter.plan = {}
   end
   if not CraftingSavedVariablesPerCharacter.considered then
