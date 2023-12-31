@@ -159,7 +159,7 @@ function _.findRecipesToCraft()
         local recipeData = AddOn.determineRecipeData(recipe.recipeID)
 
         if recipeData then
-          local window = 1 -- hour
+          local window = 3 -- hour
           local amountToCraft
           if recipeData.supportsQualities then
             Array.create(Object.entries(recipeData
@@ -427,6 +427,8 @@ craftPlannedButton:SetScript("OnClick", function()
         local canCraft, craftableAmount = craftingTask.recipeData:CanCraft(
           amountRemainingToCraft)
         print("craftableAmount", craftableAmount)
+        DevTools_Dump(craftingTask.recipeData.reagentData
+          :GetRequiredCraftingReagentInfoTbl())
         if craftableAmount >= 1 then
           craftingTask.recipeData.professionGearSet:Equip()
           Coroutine.waitFor(function()
@@ -435,8 +437,6 @@ craftPlannedButton:SetScript("OnClick", function()
           while amountRemainingToCraft >= 1 do
             local canCraft, craftableAmount = craftingTask.recipeData:CanCraft(
               amountRemainingToCraft)
-            DevTools_Dump(craftingTask.recipeData.reagentData
-              :GetRequiredCraftingReagentInfoTbl())
             print("craftableAmount", craftableAmount)
             if craftableAmount >= 1 then
               local amountToCraft = min(craftableAmount, craftingTask.amount)
