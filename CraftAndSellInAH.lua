@@ -31,7 +31,7 @@ local String = Library.retrieve("String", "^2.0.1")
 --- @field recipeID RecipeID
 --- @field amount Amount
 
---- @class Craft
+--- @class CraftingTask
 --- @field recipeID RecipeID
 --- @field amount Amount
 --- @field recipeData RecipeData
@@ -81,7 +81,7 @@ AddOn.Profession = {
   -- TODO
 }
 
---- @alias GroupedThingsToCraft { [Profession]: Craft[] }
+--- @alias GroupedThingsToCraft { [Profession]: CraftingTask[] }
 
 --- @class PurchaseTask
 --- @field itemLink ItemLink
@@ -188,7 +188,7 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
       Mathematics.sum(Object.values(retrieval))
   end)
 
-  --- @type { [RecipeID]: Craft }
+  --- @type { [RecipeID]: CraftingTask }
   local crafts = Object.fromEntries(Array.create(Object.values(Array.groupBy(
       thingsToCraft,
       function(thingToCraft)
@@ -220,7 +220,7 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
     inventory)
 
   while groups[AddOn.SourceType.Crafting] and Array.hasElements(groups[AddOn.SourceType.Crafting]) do
-    --- @type { [RecipeID]: Craft }
+    --- @type { [RecipeID]: CraftingTask }
     local furtherCrafts = Object.fromEntries(
       Object.entries(
         Array.groupBy(
@@ -328,6 +328,7 @@ function AddOn.determineRecipeData(recipeID)
   local recipeData1
   do
     recipeData1 = CraftSim.RecipeData(recipeID, false, false)
+    -- FIXME: With CraftSim freshly installed, this seems to throw an error. It seems required to open the profession window once to fix the error.
     recipeData1:SetEquippedProfessionGearSet()
     recipeData1:OptimizeProfit(false)
     averageProfit = recipeData1:GetAverageProfit()
@@ -499,7 +500,7 @@ function _.convertCraftsMapToArray(crafts)
   return Object.values(crafts)
 end
 
---- @param crafts Craft[]
+--- @param crafts CraftingTask[]
 --- @param groups Groups
 --- @param inventory Inventory
 function _.determineRetrievalsForCrafts(crafts, groups, inventory)
@@ -553,7 +554,7 @@ function _.determineThingsToRetrieve(crafts)
   return _.sum(Array.flatMap(crafts, _.determineThingsToRetrieveForCraft))
 end
 
---- @param craft Craft
+--- @param craft CraftingTask
 function _.determineThingsToRetrieveForCraft(craft)
   local thingsRequiredForCraft = _.determineThingsRequiredForCraft(craft)
   local thingsToRetrieveForThing = {}
@@ -636,7 +637,7 @@ function ThingRequired.create(data)
   return thingRequired
 end
 
---- @param craft Craft
+--- @param craft CraftingTask
 function _.determineThingsRequiredForCraft(craft)
   local thingsRequiredForThing = {}
   local thingsRequiredPerThing = _.determineThingsRequiredPerCraft(craft)
@@ -649,7 +650,7 @@ function _.determineThingsRequiredForCraft(craft)
   return thingsRequiredForThing
 end
 
---- @param craft Craft
+--- @param craft CraftingTask
 function _.determineThingsRequiredPerCraft(craft)
   local recipeID = craft.recipeID
   local recipeSchematic = C_TradeSkillUI.GetRecipeSchematic(recipeID, false)

@@ -9,9 +9,13 @@ local Array = Library.retrieve("Array", "^2.1.0")
 local Boolean = Library.retrieve("Boolean", "^2.0.0")
 --- @type Coroutine
 local Coroutine = Library.retrieve("Coroutine", "^2.0.0")
+--- @type Events
 local Events = Library.retrieve("Events", "^2.1.0")
+--- @type Mathematics
 local Mathematics = Library.retrieve("Mathematics", "^2.0.1")
+--- @type Object
 local Object = Library.retrieve("Object", "^1.1.0")
+--- @type Set
 local Set = Library.retrieve("Set", "^1.1.1")
 
 local craftingPage = ProfessionsFrame.CraftingPage
@@ -352,5 +356,29 @@ craftPlannedButton:SetSize(80, 22)
 craftPlannedButton:SetTextToFit("Craft planned")
 craftPlannedButton:SetPoint("TOPLEFT", 100, -50)
 craftPlannedButton:SetScript("OnClick", function()
-  -- CraftingSavedVariablesPerCharacter.plan
+  Coroutine.runAsCoroutineImmediately(function()
+    local professionInfo = C_TradeSkillUI.GetChildProfessionInfo()
+    local craftingTasks = groupedThingsToCraft[professionInfo.profession]
+    if craftingTasks then
+      Array.forEach(craftingTasks, function(craftingTask)
+        local amountRemainingToCraft = craftingTask.amount
+        while amountRemainingToCraft >= 1 do
+          local _, craftableAmount = craftingTask.recipeData:CanCraft(
+            amountRemainingToCraft)
+          if craftableAmount >= 1 then
+            craftingTask.recipeData.professionGearSet:Equip()
+            Coroutine.waitFor(function()
+              return CraftSim.TOPGEAR.IsEquipping == false
+            end)
+            local amountToCraft = min(craftableAmount, craftingTask.amount)
+            craftingTask.recipeData:Craft(amountToCraft)
+            amountRemainingToCraft = amountRemainingToCraft - amountToCraft
+            Events.waitForEvent("UPDATE_TRADESKILL_CAST_STOPPED")
+          else
+            break
+          end
+        end
+      end)
+    end
+  end)
 end)
