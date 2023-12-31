@@ -1,3 +1,5 @@
+-- TODO: Consider if an item can be bought for a lower price from a vendor.
+
 CraftAndSellInAH = {}
 
 --- @class AddOn
@@ -6,19 +8,19 @@ local AddOn = select(2, ...)
 local _ = {}
 
 --- @type Array
-local Array = Library.retrieve("Array", "^2.1.0")
+local Array = Library.retrieve("Array", "^2.1.1")
 --- @type Bags
 local Bags = Library.retrieve("Bags", "^2.0.5")
 --- @type Coroutine
-local Coroutine = Library.retrieve("Coroutine", "^2.0.0")
+local Coroutine = Library.retrieve("Coroutine", "^2.0.1")
 --- @type Events
-local Events = Library.retrieve("Events", "^2.0.0")
+local Events = Library.retrieve("Events", "^2.1.0")
 --- @type Mathematics
 local Mathematics = Library.retrieve("Mathematics", "^2.0.1")
 --- @type Object
-local Object = Library.retrieve("Object", "^1.1.0")
+local Object = Library.retrieve("Object", "^1.1.1")
 --- @type Set
-local Set = Library.retrieve("Set", "^1.1.1")
+local Set = Library.retrieve("Set", "^1.1.2")
 --- @type String
 local String = Library.retrieve("String", "^2.0.1")
 local CraftSim = CraftSim_DEBUG:RUN()

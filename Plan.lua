@@ -4,19 +4,19 @@ local AddOn = select(2, ...)
 local _ = {}
 
 --- @type Array
-local Array = Library.retrieve("Array", "^2.1.0")
+local Array = Library.retrieve("Array", "^2.1.1")
 --- @type Boolean
 local Boolean = Library.retrieve("Boolean", "^2.0.0")
 --- @type Coroutine
-local Coroutine = Library.retrieve("Coroutine", "^2.0.0")
+local Coroutine = Library.retrieve("Coroutine", "^2.0.1")
 --- @type Events
 local Events = Library.retrieve("Events", "^2.1.0")
 --- @type Mathematics
 local Mathematics = Library.retrieve("Mathematics", "^2.0.1")
 --- @type Object
-local Object = Library.retrieve("Object", "^1.1.0")
+local Object = Library.retrieve("Object", "^1.1.1")
 --- @type Set
-local Set = Library.retrieve("Set", "^1.1.1")
+local Set = Library.retrieve("Set", "^1.1.2")
 local CraftSim = CraftSim_DEBUG:RUN()
 
 local craftingPage = ProfessionsFrame.CraftingPage
@@ -28,6 +28,18 @@ local planDisplay = ChatFrame5
 local thingsToRetrieve
 --- @type GroupedThingsToCraft
 local groupedThingsToCraft
+
+local isAuctionHouseOpen = AuctionHouseFrame:IsShown()
+
+local onAuctionHouseShowListener = Events.listenForEvent(
+  "AUCTION_HOUSE_SHOW", function()
+    isAuctionHouseOpen = true
+  end)
+
+local onAuctionHouseClosedListener = Events.listenForEvent(
+  "AUCTION_HOUSE_CLOSED", function()
+    isAuctionHouseOpen = false
+  end)
 
 function _.update()
   local input = CraftingSavedVariablesPerCharacter.plan
@@ -95,6 +107,7 @@ buyButton:SetScript("OnClick", function()
       }
     end)
     AddOn.buy(buyTasks)
+    _.update()
   end)
 end)
 
@@ -130,6 +143,16 @@ buyButton:SetPoint("RIGHT", sellButton, "LEFT", -2, 0)
 function _.findRecipesToCraft()
   CraftingSavedVariablesPerCharacter.plan = {}
 
+  if not C_AuctionHouse.HasFullOwnedAuctionResults() then
+    C_AuctionHouse.QueryOwnedAuctions(g_auctionHouseSortsBySearchContext
+      [AuctionHouseSearchContext.AllAuctions])
+    Events.waitForEventCondition("OWNED_AUCTIONS_UPDATED", function()
+      return C_AuctionHouse.HasFullOwnedAuctionResults()
+    end)
+  end
+
+  local auctions = C_AuctionHouse.GetOwnedAuctions()
+
   Array.forEach(Object.values(CraftingSavedVariablesPerCharacter.recipes),
     function(recipe)
       if recipe.recipeInfo.learned then
@@ -150,8 +173,11 @@ function _.findRecipesToCraft()
                   "dbregionsoldperday",
                   AddOn.generateItemString(item)
                 ) or 0
-                local amountToCraft = Mathematics.round(amountSoldPerDay / 24 *
-                  window)
+                local amountInAuctionHouse = TSM_API.GetAuctionQuantity(AddOn
+                  .generateItemString(item)) or 0
+                local amountToCraft = max(
+                  Mathematics.round(amountSoldPerDay / 24 *
+                    window) - amountInAuctionHouse, 0)
                 if amountToCraft > 0 then
                   --- @type ThingToCraft
                   local item = {
@@ -170,7 +196,11 @@ function _.findRecipesToCraft()
               "dbregionsoldperday",
               AddOn.generateItemString(item)
             ) or 0
-            amountToCraft = Mathematics.round(amountSoldPerDay / 24 * window)
+            local amountInAuctionHouse = TSM_API.GetAuctionQuantity(AddOn
+              .generateItemString(item)) or 0
+            amountToCraft = max(
+              Mathematics.round(amountSoldPerDay / 24 * window) -
+              amountInAuctionHouse, 0)
             if amountToCraft > 0 then
               local item = {
                 itemLink = item:GetItemLink(),
@@ -392,38 +422,50 @@ craftPlannedButton:SetScript("OnClick", function()
     local craftingTasks = groupedThingsToCraft[professionInfo.profession]
     if craftingTasks then
       Array.forEach(craftingTasks, function(craftingTask)
+        print(C_TradeSkillUI.GetRecipeLink(craftingTask.recipeID))
         local amountRemainingToCraft = craftingTask.amount
-        while amountRemainingToCraft >= 1 do
-          local _, craftableAmount = craftingTask.recipeData:CanCraft(
-            amountRemainingToCraft)
-          print(C_TradeSkillUI.GetRecipeLink(craftingTask.recipeID))
-          DevTools_Dump(craftingTask.recipeData.reagentData
-            :GetRequiredCraftingReagentInfoTbl())
-          print("craftableAmount", craftableAmount)
-          if craftableAmount >= 1 then
-            local amountToCraft = min(craftableAmount, craftingTask.amount)
-            print("Going to craft " ..
-              amountToCraft ..
-              " x " .. C_TradeSkillUI.GetRecipeLink(craftingTask.recipeID) .. ".")
-            craftingTask.recipeData.professionGearSet:Equip()
-            Coroutine.waitFor(function()
-              return CraftSim.TOPGEAR.IsEquipping == false
-            end)
-            if CraftAndSellInAH.showConfirmButton() then
-              craftingTask.recipeData:Craft(amountToCraft)
-              amountRemainingToCraft = amountRemainingToCraft - amountToCraft
-              print(1)
-              local event = Events.waitForOneOfEvents({
-                "UPDATE_TRADESKILL_CAST_STOPPED",
-                "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_FAILED",
-                "TRADE_SKILL_CLOSE", })
-              print(2)
-              if event == "TRADE_SKILL_CLOSE" then
-                return
+        local canCraft, craftableAmount = craftingTask.recipeData:CanCraft(
+          amountRemainingToCraft)
+        print("craftableAmount", craftableAmount)
+        if craftableAmount >= 1 then
+          craftingTask.recipeData.professionGearSet:Equip()
+          Coroutine.waitFor(function()
+            return CraftSim.TOPGEAR.IsEquipping == false
+          end)
+          while amountRemainingToCraft >= 1 do
+            local canCraft, craftableAmount = craftingTask.recipeData:CanCraft(
+              amountRemainingToCraft)
+            DevTools_Dump(craftingTask.recipeData.reagentData
+              :GetRequiredCraftingReagentInfoTbl())
+            print("craftableAmount", craftableAmount)
+            if craftableAmount >= 1 then
+              local amountToCraft = min(craftableAmount, craftingTask.amount)
+              print("Going to craft " ..
+                amountToCraft ..
+                " x " ..
+                C_TradeSkillUI.GetRecipeLink(craftingTask.recipeID) .. ".")
+              if CraftAndSellInAH.showConfirmButton() then
+                craftingTask.recipeData:Craft(amountToCraft)
+                amountRemainingToCraft = amountRemainingToCraft - amountToCraft
+                print(1)
+                local events = {
+                  "UPDATE_TRADESKILL_CAST_STOPPED",
+                  "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_FAILED",
+                  "TRADE_SKILL_CLOSE",
+                }
+                if amountToCraft == 1 then
+                  Array.append(events, { "UNIT_SPELLCAST_SUCCEEDED",
+                    "UNIT_SPELLCAST_STOP", })
+                end
+                local event = Events.waitForOneOfEvents(events)
+                print(2)
+                if event == "TRADE_SKILL_CLOSE" then
+                  return
+                end
               end
+            else
+              break
             end
-          else
-            break
           end
         end
       end)
