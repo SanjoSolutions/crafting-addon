@@ -1,4 +1,3 @@
-MoneyMaking = {}
 CraftAndSellInAH = {}
 
 --- @class AddOn
@@ -20,6 +19,9 @@ local Object = Library.retrieve("Object", "^1.1.0")
 local Set = Library.retrieve("Set", "^1.1.1")
 --- @type String
 local String = Library.retrieve("String", "^2.0.1")
+local CraftSim = CraftSim_DEBUG:RUN()
+
+--- @alias Item ItemMixin
 
 --- @alias ItemLink string
 --- @alias RecipeID number
@@ -149,6 +151,7 @@ end
 --- @param thingsToCraft ThingToCraft[]
 --- @return ThingsToRetrieveStepsList, GroupedThingsToCraft
 function AddOn.determineThingsToRetrieve(thingsToCraft)
+  --- @type ThingToCraft[]
   thingsToCraft = Array.map(thingsToCraft, Object.copy)
 
   --- @type Groups
@@ -180,12 +183,18 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
           amount
       else
         groups[source][itemLink] = {
+          itemLink = itemLink,
           amount = amount,
         }
       end
     end
-    thingsToCraft.amount = thingToCraft.amount -
+    thingToCraft.amount = thingToCraft.amount -
       Mathematics.sum(Object.values(retrieval))
+  end)
+
+  --- @type ThingToCraft[]
+  thingsToCraft = Array.filter(thingsToCraft, function(thingToCraft)
+    return thingToCraft.amount >= 1
   end)
 
   --- @type { [RecipeID]: CraftingTask }
@@ -382,7 +391,7 @@ function _.purchase(purchaseTask)
     itemLink ..
     " (for a maximum unit price of " ..
     GetMoneyString(maximumUnitPriceToBuyFor) .. ").")
-  if MoneyMaking.showConfirmButton() then
+  if CraftAndSellInAH.showConfirmButton() then
     C_AuctionHouse.StartCommoditiesPurchase(itemID, quantity)
     local wasSuccessful, event, unitPrice, totalPrice = Events
       .waitForOneOfEvents(
@@ -426,34 +435,34 @@ do
   BINDING_NAME_MONEY_MAKING_CONFIRM_BUTTON = prefix .. "Confirm"
 end
 
-MoneyMaking.thread = nil
+CraftAndSellInAH.thread = nil
 
 local confirmButton = CreateFrame("Button", nil, UIParent,
   "UIPanelButtonTemplate")
-MoneyMaking.confirmButton = confirmButton
+CraftAndSellInAH.confirmButton = confirmButton
 confirmButton:SetSize(144, 48)
 confirmButton:SetText("Confirm")
 confirmButton:SetPoint("CENTER", 0, 0)
 confirmButton:SetScript("OnClick", function()
-  MoneyMaking.confirm()
+  CraftAndSellInAH.confirm()
 end)
 confirmButton:SetFrameStrata("HIGH")
 confirmButton:Hide()
 
-function MoneyMaking.showConfirmButton()
+function CraftAndSellInAH.showConfirmButton()
   confirmButton:Show()
-  MoneyMaking.thread = coroutine.running()
+  CraftAndSellInAH.thread = coroutine.running()
   local continue = coroutine.yield()
   return continue
 end
 
 --- Confirms the action.
 --- Can be done via button click or key press.
-function MoneyMaking.confirm()
+function CraftAndSellInAH.confirm()
   confirmButton:Hide()
-  if MoneyMaking.thread then
-    local thread = MoneyMaking.thread
-    MoneyMaking.thread = nil
+  if CraftAndSellInAH.thread then
+    local thread = CraftAndSellInAH.thread
+    CraftAndSellInAH.thread = nil
     Coroutine.resumeWithShowingError(thread, true)
   end
 end
@@ -468,28 +477,28 @@ function _.addItemToInventory(inventory, item)
       itemString)
   end
 
-  if not inventory[AddOn.SourceType.Bank][item] then
+  if not inventory[AddOn.SourceType.Bank][itemLink] then
     local itemString = AddOn.generateItemString(item)
-    inventory[AddOn.SourceType.Bank][item] = TSM_API.GetBankQuantity(
+    inventory[AddOn.SourceType.Bank][itemLink] = TSM_API.GetBankQuantity(
       itemString)
   end
 
-  if not inventory[AddOn.SourceType.ReagentBank][item] then
+  if not inventory[AddOn.SourceType.ReagentBank][itemLink] then
     local itemString = AddOn.generateItemString(item)
-    inventory[AddOn.SourceType.ReagentBank][item] = TSM_API
+    inventory[AddOn.SourceType.ReagentBank][itemLink] = TSM_API
       .GetReagentBankQuantity(
         itemString)
   end
 
-  if not inventory[AddOn.SourceType.Mail][item] then
+  if not inventory[AddOn.SourceType.Mail][itemLink] then
     local itemString = AddOn.generateItemString(item)
-    inventory[AddOn.SourceType.Mail][item] = TSM_API.GetMailQuantity(
+    inventory[AddOn.SourceType.Mail][itemLink] = TSM_API.GetMailQuantity(
       itemString)
   end
 
-  if not inventory[AddOn.SourceType.GuildBank][item] then
+  if not inventory[AddOn.SourceType.GuildBank][itemLink] then
     local itemString = AddOn.generateItemString(item)
-    inventory[AddOn.SourceType.GuildBank][item] = TSM_API.GetGuildQuantity(
+    inventory[AddOn.SourceType.GuildBank][itemLink] = TSM_API.GetGuildQuantity(
       itemString)
   end
 
@@ -1038,6 +1047,9 @@ function _.retrieveFromInventory(inventory, itemLink, amount)
   local amountLeft = amount
 
   local inventorySources = {
+    AddOn.SourceType.Bag,
+    AddOn.SourceType.Bank,
+    AddOn.SourceType.ReagentBank,
     AddOn.SourceType.Mail,
     AddOn.SourceType.GuildBank,
     AddOn.SourceType.OtherCharacter,

@@ -17,6 +17,7 @@ local Mathematics = Library.retrieve("Mathematics", "^2.0.1")
 local Object = Library.retrieve("Object", "^1.1.0")
 --- @type Set
 local Set = Library.retrieve("Set", "^1.1.1")
+local CraftSim = CraftSim_DEBUG:RUN()
 
 local craftingPage = ProfessionsFrame.CraftingPage
 
@@ -365,15 +366,32 @@ craftPlannedButton:SetScript("OnClick", function()
         while amountRemainingToCraft >= 1 do
           local _, craftableAmount = craftingTask.recipeData:CanCraft(
             amountRemainingToCraft)
+          print(C_TradeSkillUI.GetRecipeLink(craftingTask.recipeID))
+          DevTools_Dump(craftingTask.recipeData.reagentData
+            :GetRequiredCraftingReagentInfoTbl())
+          print("craftableAmount", craftableAmount)
           if craftableAmount >= 1 then
+            local amountToCraft = min(craftableAmount, craftingTask.amount)
+            print("Going to craft " ..
+              amountToCraft ..
+              " x " .. C_TradeSkillUI.GetRecipeLink(craftingTask.recipeID) .. ".")
             craftingTask.recipeData.professionGearSet:Equip()
             Coroutine.waitFor(function()
               return CraftSim.TOPGEAR.IsEquipping == false
             end)
-            local amountToCraft = min(craftableAmount, craftingTask.amount)
-            craftingTask.recipeData:Craft(amountToCraft)
-            amountRemainingToCraft = amountRemainingToCraft - amountToCraft
-            Events.waitForEvent("UPDATE_TRADESKILL_CAST_STOPPED")
+            if CraftAndSellInAH.showConfirmButton() then
+              craftingTask.recipeData:Craft(amountToCraft)
+              amountRemainingToCraft = amountRemainingToCraft - amountToCraft
+              print(1)
+              local event = Events.waitForOneOfEvents({
+                "UPDATE_TRADESKILL_CAST_STOPPED",
+                "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_FAILED",
+                "TRADE_SKILL_CLOSE", })
+              print(2)
+              if event == "TRADE_SKILL_CLOSE" then
+                return
+              end
+            end
           else
             break
           end
