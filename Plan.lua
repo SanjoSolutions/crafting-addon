@@ -424,12 +424,14 @@ craftPlannedButton:SetScript("OnClick", function()
       Array.forEach(craftingTasks, function(craftingTask)
         print(C_TradeSkillUI.GetRecipeLink(craftingTask.recipeID))
         local amountRemainingToCraft = craftingTask.amount
+        print("learned", craftingTask.recipeData.learned)
         local canCraft, craftableAmount = craftingTask.recipeData:CanCraft(
           amountRemainingToCraft)
         print("craftableAmount", craftableAmount)
         DevTools_Dump(craftingTask.recipeData.reagentData
           :GetRequiredCraftingReagentInfoTbl())
         if craftableAmount >= 1 then
+          C_TradeSkillUI.OpenRecipe(craftingTask.recipeData.recipeID)
           craftingTask.recipeData.professionGearSet:Equip()
           Coroutine.waitFor(function()
             return CraftSim.TOPGEAR.IsEquipping == false

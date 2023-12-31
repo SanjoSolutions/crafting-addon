@@ -368,6 +368,12 @@ function AddOn.determineRecipeData(recipeID)
     end
   end
 
+  if recipeData then
+    -- When the profession window for the profession is closed this might be set to false by CraftSim even though the recipe is learned.
+    -- We set it here to true so that CanCraft correctly works.
+    recipeData.learned = true
+  end
+
   return recipeData
 end
 
