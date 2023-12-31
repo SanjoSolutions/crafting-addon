@@ -1,3 +1,4 @@
+MoneyMaking = {}
 CraftAndSellInAH = {}
 
 --- @class AddOn
@@ -9,6 +10,8 @@ local _ = {}
 local Array = Library.retrieve("Array", "^2.1.0")
 --- @type Coroutine
 local Coroutine = Library.retrieve("Coroutine", "^2.0.0")
+--- @type Events
+local Events = Library.retrieve("Events", "^2.0.0")
 --- @type Mathematics
 local Mathematics = Library.retrieve("Mathematics", "^2.0.1")
 --- @type Object
@@ -21,6 +24,7 @@ local String = Library.retrieve("String", "^2.0.1")
 --- @alias ItemLink string
 --- @alias RecipeID number
 --- @alias Amount number
+--- @alias Money number
 
 --- @class ThingToCraft
 --- @field itemLink ItemLink
@@ -34,6 +38,10 @@ local String = Library.retrieve("String", "^2.0.1")
 
 --- @class ThingToRetrieve
 --- @field itemLinks Set
+--- @field amount number
+
+--- @class ItemToRetrieve
+--- @field itemLink ItemLink
 --- @field amount number
 
 --- @enum SourceType
@@ -56,7 +64,7 @@ AddOn.SourceType = {
 
 --- @alias BestSources { [SourceType]: ItemRetrievalEntry[] }
 
---- @alias Groups { [SourceType]: { [ItemLink]: ThingToRetrieve } }
+--- @alias Groups { [SourceType]: { [ItemLink]: ItemToRetrieve } }
 
 --- @alias Inventory { [SourceType]: { [ItemLink]: number } }
 
@@ -66,7 +74,7 @@ AddOn.SourceType = {
 
 --- @class ThingsToRetrieveStep
 --- @field source SourceType
---- @field thingsToRetrieveFromSource
+--- @field thingsToRetrieveFromSource ItemToRetrieve[]
 
 --- @enum Profession
 AddOn.Profession = {
@@ -74,6 +82,11 @@ AddOn.Profession = {
 }
 
 --- @alias GroupedThingsToCraft { [Profession]: Craft[] }
+
+--- @class PurchaseTask
+--- @field itemLink ItemLink
+--- @field amount Amount
+--- @field maximumUnitPriceToBuyFor Money
 
 CraftAndSellInAH._ = _
 
@@ -340,6 +353,110 @@ function AddOn.determineRecipeData(recipeID)
   return recipeData
 end
 
+local sorts = {
+  {
+    sortOrder = Enum.AuctionHouseSortOrder.Price,
+    reverseSort = false,
+  },
+}
+
+--- @param purchaseTasks PurchaseTask[]
+AddOn.buy = function(purchaseTasks)
+  Array.forEach(purchaseTasks, _.purchase)
+  print("Have worked through the full purchase list.")
+end
+
+--- @param buyTask PurchaseTask
+function _.purchase(purchaseTask)
+  local quantity = purchaseTask.amount
+  local maximumUnitPriceToBuyFor = purchaseTask.maximumUnitPriceToBuyFor
+
+  local item = AddOn.createItem(purchaseTask.itemLink)
+  AddOn.loadItem(item)
+  local itemID = item:GetItemID()
+  local itemLink = item:GetItemLink()
+  print("Trying to buy " ..
+    quantity ..
+    " x " ..
+    itemLink ..
+    " (for a maximum unit price of " ..
+    GetMoneyString(maximumUnitPriceToBuyFor) .. ").")
+  if MoneyMaking.showConfirmButton() then
+    C_AuctionHouse.StartCommoditiesPurchase(itemID, quantity)
+    local wasSuccessful, event, unitPrice, totalPrice = Events
+      .waitForOneOfEvents(
+        { "COMMODITY_PRICE_UPDATED", "COMMODITY_PRICE_UNAVAILABLE", },
+        3)
+    if event == "COMMODITY_PRICE_UPDATED" then
+      if unitPrice <= maximumUnitPriceToBuyFor then
+        C_AuctionHouse.ConfirmCommoditiesPurchase(itemID, quantity)
+        local wasSuccessful, event = Events.waitForOneOfEvents(
+          { "COMMODITY_PURCHASE_SUCCEEDED", "COMMODITY_PURCHASE_FAILED", },
+          3)
+        if wasSuccessful and event == "COMMODITY_PURCHASE_SUCCEEDED" then
+          print("Have bought " ..
+            quantity ..
+            " x " ..
+            itemLink ..
+            " (for a unit price of " .. GetMoneyString(unitPrice) .. ").")
+        else
+          print("Have skipped buying " ..
+            quantity ..
+            " x " ..
+            itemLink ..
+            " because there was an error.")
+        end
+      else
+        print("Have skipped buying " ..
+          quantity ..
+          " x " ..
+          itemLink ..
+          " because the unit price was higher than the maximum unit price to buy for (" ..
+          GetMoneyString(unitPrice) ..
+          " > " .. GetMoneyString(maximumUnitPriceToBuyFor) .. ").")
+      end
+    end
+  end
+end
+
+do
+  BINDING_HEADER_MONEY_MAKING = "Money Making"
+  local prefix = "Money Making: "
+  BINDING_NAME_MONEY_MAKING_CONFIRM_BUTTON = prefix .. "Confirm"
+end
+
+MoneyMaking.thread = nil
+
+local confirmButton = CreateFrame("Button", nil, UIParent,
+  "UIPanelButtonTemplate")
+MoneyMaking.confirmButton = confirmButton
+confirmButton:SetSize(144, 48)
+confirmButton:SetText("Confirm")
+confirmButton:SetPoint("CENTER", 0, 0)
+confirmButton:SetScript("OnClick", function()
+  MoneyMaking.confirm()
+end)
+confirmButton:SetFrameStrata("HIGH")
+confirmButton:Hide()
+
+function MoneyMaking.showConfirmButton()
+  confirmButton:Show()
+  MoneyMaking.thread = coroutine.running()
+  local continue = coroutine.yield()
+  return continue
+end
+
+--- Confirms the action.
+--- Can be done via button click or key press.
+function MoneyMaking.confirm()
+  confirmButton:Hide()
+  if MoneyMaking.thread then
+    local thread = MoneyMaking.thread
+    MoneyMaking.thread = nil
+    Coroutine.resumeWithShowingError(thread, true)
+  end
+end
+
 --- @param item Item
 function _.addItemToInventory(inventory, item)
   local itemLink = item:GetItemLink()
@@ -392,11 +509,13 @@ function _.determineRetrievalsForCrafts(crafts, groups, inventory)
       thingToRetrieve.amount -
       Mathematics.sum(Array.map(thingToRetrieve.itemLinks:toList(),
         function(itemLink)
-          local itemString = AddOn.generateItemString(AddOn.createItem(itemLink))
+          local item = AddOn.createItem(itemLink)
+          local itemString = AddOn.generateItemString(item)
           -- Reagents from those sources can directly be used for crafting.
-          return TSM_API.GetBagQuantity(itemString) +
+          local amount = TSM_API.GetBagQuantity(itemString) +
             TSM_API.GetBankQuantity(itemString) +
             TSM_API.GetReagentBankQuantity(itemString)
+          return amount
         end)), 0)
   end)
   thingsToRetrieve = Array.filter(thingsToRetrieve, function(thingToRetrieve)
@@ -448,12 +567,6 @@ function _.determineThingsToRetrieveForCraft(craft)
       }
       return item
     end)
-    if #itemLinks <= 0 then
-      print("f")
-    end
-    if #itemsWithPrices <= 0 then
-      print("g")
-    end
     local itemWithLowestPrice = Array.min(itemsWithPrices,
       function(itemWithPrice)
         return itemWithPrice.price
@@ -467,9 +580,10 @@ function _.determineThingsToRetrieveForCraft(craft)
           local itemString = AddOn.generateItemString(AddOn.createItem(item
             .itemLink))
           -- Reagents from those sources can directly be used for crafting.
-          return TSM_API.GetBagQuantity(itemString) +
+          local amount = TSM_API.GetBagQuantity(itemString) +
             TSM_API.GetBankQuantity(itemString) +
             TSM_API.GetReagentBankQuantity(itemString)
+          return amount
         end)), 0)
     if amount >= 1 then
       local thingToRetrieveForThing = Object.assign({}, thingRequiredForThing, {
@@ -554,23 +668,34 @@ function _.determineThingsRequiredPerCraft(craft)
       else
         recipeID = nil
       end
-      local reagent = Array.find(craft.recipeData.reagentData.requiredReagents,
-        function(reagent)
-          return reagent.dataSlotIndex == reagentSlotSchematic.dataSlotIndex
+
+      if #itemIDs == 1 then
+        local item = AddOn.createItem(itemIDs[1])
+        AddOn.loadItem(item)
+        local itemLink = item:GetItemLink()
+        table.insert(thingsToBuy, {
+          recipeID = recipeID,
+          itemLinks = Set.create({ itemLink, }),
+          amount = reagentSlotSchematic.quantityRequired,
+        })
+      elseif #itemIDs >= 2 then
+        local reagent = Array.find(craft.recipeData.reagentData.requiredReagents,
+          function(reagent)
+            return reagent.dataSlotIndex == reagentSlotSchematic.dataSlotIndex
+          end)
+        Array.forEach(reagent.items, function(item)
+          local quantity = item.quantity
+          if quantity > 0 then
+            AddOn.loadItem(item.item)
+            local itemLink = item.item:GetItemLink()
+            table.insert(thingsToBuy, {
+              recipeID = recipeID,
+              itemLinks = Set.create({ itemLink, }),
+              amount = quantity,
+            })
+          end
         end)
-      Array.forEach(reagent.items, function(item)
-        local quantity = item.quantity
-        if quantity > 0 then
-          AddOn.loadItem(item.item)
-          local itemLink = item.item:GetItemLink()
-          print("itemLink", itemLink)
-          table.insert(thingsToBuy, {
-            recipeID = recipeID,
-            itemLinks = Set.create({ itemLink, }),
-            amount = quantity,
-          })
-        end
-      end)
+      end
     end
   end)
   if craft.missiveIDs then
@@ -580,7 +705,6 @@ function _.determineThingsRequiredPerCraft(craft)
     else
       recipeID = nil
     end
-    print("d")
     local recipeID = table.insert(thingsToBuy, {
       recipeID = recipeID,
       itemLinks = Array.map(craft.missiveIDs, _.convertItemIDToItemLink),
@@ -777,11 +901,28 @@ end
 --- @param item Item
 function AddOn.generateItemString(item)
   local itemString = "i:" .. item:GetItemID()
-  local itemLevel = item:GetCurrentItemLevel()
-  if itemLevel then
-    itemString = itemString .. "::i" .. itemLevel
+  if not AddOn.isCommodityItem(item) then
+    local itemLevel = item:GetCurrentItemLevel()
+    if itemLevel then
+      itemString = itemString .. "::i" .. itemLevel
+    end
   end
   return itemString
+end
+
+--- @param item Item
+function AddOn.isCommodityItem(item)
+  local classID, subclassID = select(6, GetItemInfoInstant(item:GetItemLink()))
+  return (
+    classID == Enum.ItemClass.Consumable or
+    classID == Enum.ItemClass.Gem or
+    classID == Enum.ItemClass.Tradegoods or
+    classID == Enum.ItemClass.ItemEnhancement or
+    classID == Enum.ItemClass.Questitem or
+    (classID == Enum.ItemClass.Miscellaneous and subclassID ~= Enum.ItemMiscellaneousSubclass.Mount) or
+    classID == Enum.ItemClass.Glyph or
+    classID == Enum.ItemClass.Key
+  )
 end
 
 function _.generateThingsToCraftText(thingsToCraft)
@@ -970,7 +1111,7 @@ function AddOn.determineBestSourcesToRetrieveThingFrom(inventory, thingToRetriev
       }
       local npcBuyPrice = _.determineNPCBuyPrice(itemLink)
       local craftingPrice = _.determineCraftingCost(item)
-      local auctionHouseBuyPrice = _.determineAuctionHouseBuyPrice(AddOn
+      local auctionHouseBuyPrice = AddOn.determineAuctionHouseBuyPrice(AddOn
         .createItem(item.itemLink))
       local sources = {}
       if npcBuyPrice then
@@ -1061,7 +1202,7 @@ function _.determineCraftingPrice(itemID)
 end
 
 --- @param item Item
-function _.determineAuctionHouseBuyPrice(item)
+function AddOn.determineAuctionHouseBuyPrice(item)
   local itemString = AddOn.generateItemString(item)
   return TSM_API.GetCustomPriceValue("DBRecent", itemString)
 end

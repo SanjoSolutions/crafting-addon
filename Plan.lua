@@ -3,8 +3,11 @@ local addOnName = select(1, ...)
 local AddOn = select(2, ...)
 local _ = {}
 
+--- @type Array
 local Array = Library.retrieve("Array", "^2.1.0")
+--- @type Boolean
 local Boolean = Library.retrieve("Boolean", "^2.0.0")
+--- @type Coroutine
 local Coroutine = Library.retrieve("Coroutine", "^2.0.0")
 local Events = Library.retrieve("Events", "^2.1.0")
 local Mathematics = Library.retrieve("Mathematics", "^2.0.1")
@@ -15,6 +18,11 @@ local craftingPage = ProfessionsFrame.CraftingPage
 
 local inputDisplay = ChatFrame4
 local planDisplay = ChatFrame5
+
+--- @type ThingsToRetrieveStepsList
+local thingsToRetrieve
+--- @type GroupedThingsToCraft
+local groupedThingsToCraft
 
 function _.update()
   local input = CraftingSavedVariablesPerCharacter.plan
@@ -27,7 +35,7 @@ function _.update()
   end)
   AddOn.showText(inputDisplay, inputText)
 
-  local thingsToRetrieve, groupedThingsToCraft = AddOn.determineThingsToRetrieve(
+  thingsToRetrieve, groupedThingsToCraft = AddOn.determineThingsToRetrieve(
     input)
   local planText = AddOn.generatePlanText(input, thingsToRetrieve,
     groupedThingsToCraft)
@@ -57,6 +65,8 @@ evaluateButton:SetScript("OnClick", function()
   end)
 end)
 
+local TOLERANCE_AMOUNT = 10000
+
 local buyButton = CreateFrame("Button", nil,
   AuctionHouseFrame,
   "UIPanelButtonTemplate")
@@ -65,7 +75,22 @@ buyButton:SetTextToFit("Buy")
 buyButton:SetPoint("BOTTOMRIGHT", -5, 3)
 buyButton:SetScript("OnClick", function()
   Coroutine.runAsCoroutineImmediately(function()
-
+    local thingsToRetrieveFromAH = Array.find(thingsToRetrieve,
+      function(thingToRetrieve)
+        return thingToRetrieve.source == AddOn.SourceType.AuctionHouse
+      end).thingsToRetrieveFromSource
+    local buyTasks = Array.map(thingsToRetrieveFromAH, function(thingToRetrieve)
+      local item = AddOn.createItem(thingToRetrieve.itemLink)
+      AddOn.loadItem(item)
+      local maximumUnitPriceToBuyFor = AddOn.determineAuctionHouseBuyPrice(item) +
+        TOLERANCE_AMOUNT
+      return {
+        itemLink = thingToRetrieve.itemLink,
+        amount = thingToRetrieve.amount,
+        maximumUnitPriceToBuyFor = maximumUnitPriceToBuyFor,
+      }
+    end)
+    AddOn.buy(buyTasks)
   end)
 end)
 
@@ -74,54 +99,56 @@ function _.findRecipesToCraft()
 
   Array.forEach(Object.values(CraftingSavedVariablesPerCharacter.recipes),
     function(recipe)
-      local recipeData = AddOn.determineRecipeData(recipe.recipeID)
+      if recipe.recipeInfo.learned then
+        local recipeData = AddOn.determineRecipeData(recipe.recipeID)
 
-      if recipeData then
-        local window = 1 -- hour
-        local amountToCraft
-        if recipeData.supportsQualities then
-          Array.create(Object.entries(recipeData
-            .resultData.chanceByQuality)):forEach(function(entry)
-            local chance = entry.value
-            if chance > 0 then
-              local quality = entry.key
-              local item = recipeData.resultData.itemsByQuality[quality]
-              AddOn.loadItem(item)
-              local amountSoldPerDay = TSM_API.GetCustomPriceValue(
-                "dbregionsoldperday",
-                AddOn.generateItemString(item)
-              ) or 0
-              local amountToCraft = Mathematics.round(amountSoldPerDay / 24 *
-                window)
-              if amountToCraft > 0 then
-                local item = {
-                  itemLink = item:GetItemLink(),
-                  recipeID = recipe.recipeID,
-                  amount = amountToCraft,
-                }
-                table.insert(CraftingSavedVariablesPerCharacter.plan, item)
+        if recipeData then
+          local window = 1 -- hour
+          local amountToCraft
+          if recipeData.supportsQualities then
+            Array.create(Object.entries(recipeData
+              .resultData.chanceByQuality)):forEach(function(entry)
+              local chance = entry.value
+              if chance > 0 then
+                local quality = entry.key
+                local item = recipeData.resultData.itemsByQuality[quality]
+                AddOn.loadItem(item)
+                local amountSoldPerDay = TSM_API.GetCustomPriceValue(
+                  "dbregionsoldperday",
+                  AddOn.generateItemString(item)
+                ) or 0
+                local amountToCraft = Mathematics.round(amountSoldPerDay / 24 *
+                  window)
+                if amountToCraft > 0 then
+                  local item = {
+                    itemLink = item:GetItemLink(),
+                    recipeID = recipe.recipeID,
+                    amount = amountToCraft,
+                  }
+                  table.insert(CraftingSavedVariablesPerCharacter.plan, item)
+                end
               end
+            end)
+          else
+            local item = recipeData.resultData.itemsByQuality[1]
+            AddOn.loadItem(item)
+            local amountSoldPerDay = TSM_API.GetCustomPriceValue(
+              "dbregionsoldperday",
+              AddOn.generateItemString(item)
+            ) or 0
+            amountToCraft = Mathematics.round(amountSoldPerDay / 24 * window)
+            if amountToCraft > 0 then
+              local item = {
+                itemLink = item:GetItemLink(),
+                recipeID = recipe.recipeID,
+                amount = amountToCraft,
+              }
+              table.insert(CraftingSavedVariablesPerCharacter.plan, item)
             end
-          end)
-        else
-          local item = recipeData.resultData.itemsByQuality[1]
-          AddOn.loadItem(item)
-          local amountSoldPerDay = TSM_API.GetCustomPriceValue(
-            "dbregionsoldperday",
-            AddOn.generateItemString(item)
-          ) or 0
-          amountToCraft = Mathematics.round(amountSoldPerDay / 24 * window)
-          if amountToCraft > 0 then
-            local item = {
-              itemLink = item:GetItemLink(),
-              recipeID = recipe.recipeID,
-              amount = amountToCraft,
-            }
-            table.insert(CraftingSavedVariablesPerCharacter.plan, item)
           end
-        end
 
-        Coroutine.yieldAndResume()
+          Coroutine.yieldAndResume()
+        end
       end
     end)
   _.update()
@@ -313,8 +340,17 @@ local scanRecipesButton = CreateFrame("Button", nil, craftingPage,
   "UIPanelButtonTemplate")
 scanRecipesButton:SetSize(80, 22)
 scanRecipesButton:SetTextToFit("Scan recipes")
-scanRecipesButton:SetPoint("TOPLEFT", 100, -40)
+scanRecipesButton:SetPoint("TOPLEFT", 100, -26)
 scanRecipesButton:SetScript("OnClick", function()
   AddOn.scanRecipes()
   print("Recipes have been scanned.")
+end)
+
+local craftPlannedButton = CreateFrame("Button", nil, craftingPage,
+  "UIPanelButtonTemplate")
+craftPlannedButton:SetSize(80, 22)
+craftPlannedButton:SetTextToFit("Craft planned")
+craftPlannedButton:SetPoint("TOPLEFT", 100, -50)
+craftPlannedButton:SetScript("OnClick", function()
+  -- CraftingSavedVariablesPerCharacter.plan
 end)
