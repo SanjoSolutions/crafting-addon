@@ -151,7 +151,9 @@ function _.findRecipesToCraft()
         local recipeData = AddOn.determineRecipeData(recipe.recipeID)
 
         if recipeData and not Array.any(C_TradeSkillUI.GetRecipeRequirements(recipeData.recipeID), function(
-            requirement) return requirement.name == "Earth-Warder's Forge" end) and recipeData:GetAverageProfit() > 0 then
+            requirement)
+            return requirement.name == "Earth-Warder's Forge"
+          end) and recipeData:GetAverageProfit() > 0 then
           local window = 1 -- hour
           local amountToCraft
           if recipeData.supportsQualities then
@@ -212,9 +214,17 @@ function _.findRecipesToCraft()
 end
 
 AddOn.retrieveProfessions = function()
-  local professions = {}
-  local professionIndex1, professionIndex2 = GetProfessions()
-  local professionIndexes = { professionIndex1, professionIndex2, }
+  local professionIndex1, professionIndex2, __, __, cookingIndex = GetProfessions()
+  local professionIndexes = {}
+  if professionIndex1 then
+    table.insert(professionIndexes, professionIndex1)
+  end
+  if professionIndex2 then
+    table.insert(professionIndexes, professionIndex2)
+  end
+  if cookingIndex then
+    table.insert(professionIndexes, cookingIndex)
+  end
   local professions = Array.map(professionIndexes, function(professionIndex)
     local name = GetProfessionInfo(professionIndex)
     return { index = professionIndex, name = name, }
