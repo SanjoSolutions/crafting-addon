@@ -347,6 +347,11 @@ function AddOn.determineRecipeData(recipeID)
   local recipeData = CraftSim.RecipeData(recipeID, false, false)
   -- FIXME: With CraftSim freshly installed, this seems to throw an error. It seems required to open the profession window once to fix the error.
   recipeData:SetEquippedProfessionGearSet()
+  if not recipeData.hasQualityReagents then
+    for index, reagent in ipairs(recipeData.reagentData.requiredReagents) do
+      reagent.items[1].quantity = reagent.requiredQuantity
+    end
+  end
   recipeData:OptimizeProfit()
   -- When the profession window for the profession is closed this might be set to false by CraftSim even though the recipe is learned.
   -- We set it here to true so that CanCraft correctly works.

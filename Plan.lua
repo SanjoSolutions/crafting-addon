@@ -427,12 +427,8 @@ craftPlannedButton:SetScript("OnClick", function()
       for index, craftingTask in ipairs(craftingTasks) do
         print(C_TradeSkillUI.GetRecipeLink(craftingTask.recipeID))
         local amountRemainingToCraft = craftingTask.amount
-        print("learned", craftingTask.recipeData.learned)
         local canCraft, craftableAmount = craftingTask.recipeData:CanCraft(
           amountRemainingToCraft)
-        print("craftableAmount", craftableAmount)
-        DevTools_Dump(craftingTask.recipeData.reagentData
-          :GetRequiredCraftingReagentInfoTbl())
         if craftableAmount >= 1 then
           local listener
           listener = Events.listenForEvent("TRADE_SKILL_CLOSE", function()
