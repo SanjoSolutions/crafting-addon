@@ -206,11 +206,12 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
   end)
 
   --- @type { [RecipeID]: CraftingTask }
-  local crafts = Object.fromEntries(Array.create(Object.values(Array.groupBy(
-      thingsToCraft,
-      function(thingToCraft)
-        return thingToCraft.recipeID
-      end)))
+  local craftingTasks = Object.fromEntries(Array.create(Object.values(Array
+      .groupBy(
+        thingsToCraft,
+        function(thingToCraft)
+          return thingToCraft.recipeID
+        end)))
     :map(function(thingsToCraft)
       local recipeID = thingsToCraft[1].recipeID
 
@@ -233,7 +234,8 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
       end
     end):selectTrue())
 
-  _.determineRetrievalsForCrafts(_.convertCraftsMapToArray(crafts), groups,
+  _.determineRetrievalsForCrafts(_.convertCraftingTasksMapToArray(craftingTasks),
+    groups,
     inventory)
 
   while groups[AddOn.SourceType.Crafting] and Array.hasElements(groups[AddOn.SourceType.Crafting]) do
@@ -281,15 +283,16 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
     )
 
     for recipeID, craft in pairs(furtherCrafts) do
-      if crafts[recipeID] then
-        crafts[recipeID].amount = crafts[recipeID].amount + craft.amount
+      if craftingTasks[recipeID] then
+        craftingTasks[recipeID].amount = craftingTasks[recipeID].amount +
+          craft.amount
       else
-        crafts[recipeID] = craft
+        craftingTasks[recipeID] = craft
       end
     end
     groups[AddOn.SourceType.Crafting] = nil
     _.determineRetrievalsForCrafts(
-      _.convertCraftsMapToArray(furtherCrafts),
+      _.convertCraftingTasksMapToArray(furtherCrafts),
       groups,
       inventory
     )
@@ -317,7 +320,8 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
   end)
 
   --- @type GroupedThingsToCraft
-  local groupedThingsToCraft = Array.groupBy(_.convertCraftsMapToArray(crafts),
+  local groupedThingsToCraft = Array.groupBy(
+    _.convertCraftingTasksMapToArray(craftingTasks),
     function(thingToCraft)
       return CraftingSavedVariablesPerCharacter.recipes[thingToCraft.recipeID]
         .profession
@@ -325,8 +329,9 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
 
   Array.create(Object.values(groupedThingsToCraft)):forEach(function(
     thingsToCraft)
-    table.sort(crafts, function(a, b)
-      local thingsRequiredForB = _.determineThingsRequiredPerCraft(b.recipeID)
+    table.sort(craftingTasks, function(a, b)
+      local thingsRequiredForB = _.determineThingsRequiredPerCraftingTask(b
+        .recipeID)
       return Array.any(
         thingsRequiredForB.reagentData.requiredReagents, function(reagent)
           return _.retrieveRecipeIDForItem(reagent.items[1].item:GetItemID()) ==
@@ -575,6 +580,15 @@ function CraftAndSellInAH.confirm()
   end
 end
 
+function CraftAndSellInAH.cancel()
+  confirmButton:Hide()
+  if CraftAndSellInAH.thread then
+    local thread = CraftAndSellInAH.thread
+    CraftAndSellInAH.thread = nil
+    Coroutine.resumeWithShowingError(thread, false)
+  end
+end
+
 --- @param item Item
 function _.addItemToInventory(inventory, item)
   local itemLink = item:GetItemLink()
@@ -613,32 +627,15 @@ function _.addItemToInventory(inventory, item)
   -- TODO: Other characters
 end
 
-function _.convertCraftsMapToArray(crafts)
+function _.convertCraftingTasksMapToArray(crafts)
   return Object.values(crafts)
 end
 
---- @param crafts CraftingTask[]
+--- @param craftingTasks CraftingTask[]
 --- @param groups Groups
 --- @param inventory Inventory
-function _.determineRetrievalsForCrafts(crafts, groups, inventory)
-  local thingsToRetrieve = _.determineThingsToRetrieve(crafts)
-  Array.forEach(thingsToRetrieve, function(thingToRetrieve)
-    thingToRetrieve.amount = math.max(
-      thingToRetrieve.amount -
-      Mathematics.sum(Array.map(thingToRetrieve.itemLinks:toList(),
-        function(itemLink)
-          local item = AddOn.createItem(itemLink)
-          local itemString = AddOn.generateItemString(item)
-          -- Reagents from those sources can directly be used for crafting.
-          local amount = TSM_API.GetBagQuantity(itemString) +
-            TSM_API.GetBankQuantity(itemString) +
-            TSM_API.GetReagentBankQuantity(itemString)
-          return amount
-        end)), 0)
-  end)
-  thingsToRetrieve = Array.filter(thingsToRetrieve, function(thingToRetrieve)
-    return thingToRetrieve.amount >= 1
-  end)
+function _.determineRetrievalsForCrafts(craftingTasks, groups, inventory)
+  local thingsToRetrieve = _.determineThingsToRetrieve(craftingTasks)
 
   Array.forEach(thingsToRetrieve, function(thingToRetrieve)
     Array.forEach(thingToRetrieve.itemLinks:toList(), function(itemLink)
@@ -666,14 +663,36 @@ function _.determineRetrievalsForCrafts(crafts, groups, inventory)
   end)
 end
 
+--- @param craftingTasks CraftingTask[]
 --- @return ThingToRetrieve[]
-function _.determineThingsToRetrieve(crafts)
-  return _.sum(Array.flatMap(crafts, _.determineThingsToRetrieveForCraft))
+function _.determineThingsToRetrieve(craftingTasks)
+  local thingsToRetrieve = _.sum(Array.flatMap(craftingTasks,
+    _.determineThingsToRetrieveForCraftingTask))
+  Array.forEach(thingsToRetrieve, function(thingToRetrieve)
+    thingToRetrieve.amount = math.max(
+      thingToRetrieve.amount -
+      Mathematics.sum(Array.map(thingToRetrieve.itemLinks:toList(),
+        function(itemLink)
+          local item = AddOn.createItem(itemLink)
+          local itemString = AddOn.generateItemString(item)
+          -- Reagents from those sources can directly be used for crafting.
+          local amount = TSM_API.GetBagQuantity(itemString) +
+            TSM_API.GetBankQuantity(itemString) +
+            TSM_API.GetReagentBankQuantity(itemString)
+          return amount
+        end)), 0)
+  end)
+  --- @type ThingToRetrieve[]
+  thingsToRetrieve = Array.filter(thingsToRetrieve, function(thingToRetrieve)
+    return thingToRetrieve.amount >= 1
+  end)
+  return thingsToRetrieve
 end
 
---- @param craft CraftingTask
-function _.determineThingsToRetrieveForCraft(craft)
-  local thingsRequiredForCraft = _.determineThingsRequiredForCraft(craft)
+--- @param craftingTask CraftingTask
+function _.determineThingsToRetrieveForCraftingTask(craftingTask)
+  local thingsRequiredForCraft = _.determineThingsRequiredForCraftingTask(
+    craftingTask)
   local thingsToRetrieveForThing = {}
 
   Array.forEach(thingsRequiredForCraft, function(thingRequiredForThing)
@@ -692,26 +711,14 @@ function _.determineThingsToRetrieveForCraft(craft)
     local selectedItems = Array.filter(itemsWithPrices, function(itemWithPrice)
       return itemWithPrice.price <= itemWithLowestPrice.price
     end)
-    local amount = math.max(
-      thingRequiredForThing.amount - Mathematics.sum(Array.map(selectedItems,
-        function(item)
-          local itemString = AddOn.generateItemString(AddOn.createItem(item
-            .itemLink))
-          -- Reagents from those sources can directly be used for crafting.
-          local amount = TSM_API.GetBagQuantity(itemString) +
-            TSM_API.GetBankQuantity(itemString) +
-            TSM_API.GetReagentBankQuantity(itemString)
-          return amount
-        end)), 0)
-    if amount >= 1 then
-      local thingToRetrieveForThing = Object.assign({}, thingRequiredForThing, {
-        itemLinks = Set.create(Array.map(selectedItems, function(item)
-          return item.itemLink
-        end)),
-        amount = amount,
-      })
-      table.insert(thingsToRetrieveForThing, thingToRetrieveForThing)
-    end
+    local amount = thingRequiredForThing.amount
+    local thingToRetrieveForThing = Object.assign({}, thingRequiredForThing, {
+      itemLinks = Set.create(Array.map(selectedItems, function(item)
+        return item.itemLink
+      end)),
+      amount = amount,
+    })
+    table.insert(thingsToRetrieveForThing, thingToRetrieveForThing)
   end)
 
   return thingsToRetrieveForThing
@@ -754,22 +761,25 @@ function ThingRequired.create(data)
   return thingRequired
 end
 
---- @param craft CraftingTask
-function _.determineThingsRequiredForCraft(craft)
+--- @param craftingTask CraftingTask
+function _.determineThingsRequiredForCraftingTask(craftingTask)
   local thingsRequiredForThing = {}
-  local thingsRequiredPerThing = _.determineThingsRequiredPerCraft(craft)
+  local thingsRequiredPerThing = _.determineThingsRequiredPerCraftingTask(
+    craftingTask)
+
   Array.forEach(thingsRequiredPerThing, function(thingRequiredPerThing)
     table.insert(thingsRequiredForThing,
       Object.assign({}, thingRequiredPerThing, {
-        amount = (craft.amount or 1) * thingRequiredPerThing.amount,
+        amount = (craftingTask.amount or 1) * thingRequiredPerThing.amount,
       }))
   end)
+
   return thingsRequiredForThing
 end
 
---- @param craft CraftingTask
-function _.determineThingsRequiredPerCraft(craft)
-  local recipeID = craft.recipeID
+--- @param craftingTask CraftingTask
+function _.determineThingsRequiredPerCraftingTask(craftingTask)
+  local recipeID = craftingTask.recipeID
   local recipeSchematic = C_TradeSkillUI.GetRecipeSchematic(recipeID, false)
   local reagentSlotSchematics = recipeSchematic.reagentSlotSchematics
   local thingsToBuy = {}
@@ -797,10 +807,15 @@ function _.determineThingsRequiredPerCraft(craft)
           amount = reagentSlotSchematic.quantityRequired,
         })
       elseif #itemIDs >= 2 then
-        local reagent = Array.find(craft.recipeData.reagentData.requiredReagents,
+        local reagent = Array.find(
+          craftingTask.recipeData.reagentData.requiredReagents,
           function(reagent)
-            return reagent.dataSlotIndex == reagentSlotSchematic.dataSlotIndex
+            -- CraftSim Reagent had only dataSlotIndex (and slotIndex was absent).
+            -- So instead we check if the first item ID matches.
+            return reagent.items[1].item:GetItemID() ==
+              reagentSlotSchematic.reagents[1].itemID
           end)
+
         Array.forEach(reagent.items, function(item)
           local quantity = item.quantity
           if quantity > 0 then
@@ -816,16 +831,16 @@ function _.determineThingsRequiredPerCraft(craft)
       end
     end
   end)
-  if craft.missiveIDs then
+  if craftingTask.missiveIDs then
     local recipeID
-    if Array.hasElements(craft.missiveIDs) then
-      recipeID = _.retrieveRecipeIDForItem(craft.missiveIDs[1])
+    if Array.hasElements(craftingTask.missiveIDs) then
+      recipeID = _.retrieveRecipeIDForItem(craftingTask.missiveIDs[1])
     else
       recipeID = nil
     end
-    local recipeID = table.insert(thingsToBuy, {
+    table.insert(thingsToBuy, {
       recipeID = recipeID,
-      itemLinks = Array.map(craft.missiveIDs, _.convertItemIDToItemLink),
+      itemLinks = Array.map(craftingTask.missiveIDs, _.convertItemIDToItemLink),
       amount = 1,
     })
   end

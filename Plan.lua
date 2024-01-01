@@ -65,6 +65,7 @@ evaluateButton:SetSize(80, 22)
 evaluateButton:SetTextToFit("Evaluate")
 evaluateButton:SetPoint("BOTTOMRIGHT", -10, 100)
 evaluateButton:SetScript("OnClick", function()
+  print("Evaluating...")
   Coroutine.runAsCoroutineImmediately(function()
     local professions = AddOn.retrieveProfessions()
     local hasScannedAProfession = false
@@ -79,6 +80,7 @@ evaluateButton:SetScript("OnClick", function()
     end
 
     _.findRecipesToCraft()
+    print("Have finished evaluating.")
   end)
 end)
 
@@ -142,16 +144,6 @@ buyButton:SetPoint("RIGHT", sellButton, "LEFT", -2, 0)
 
 function _.findRecipesToCraft()
   CraftingSavedVariablesPerCharacter.plan = {}
-
-  if not C_AuctionHouse.HasFullOwnedAuctionResults() then
-    C_AuctionHouse.QueryOwnedAuctions(g_auctionHouseSortsBySearchContext
-      [AuctionHouseSearchContext.AllAuctions])
-    Events.waitForEventCondition("OWNED_AUCTIONS_UPDATED", function()
-      return C_AuctionHouse.HasFullOwnedAuctionResults()
-    end)
-  end
-
-  local auctions = C_AuctionHouse.GetOwnedAuctions()
 
   Array.forEach(Object.values(CraftingSavedVariablesPerCharacter.recipes),
     function(recipe)
@@ -421,7 +413,7 @@ craftPlannedButton:SetScript("OnClick", function()
     local professionInfo = C_TradeSkillUI.GetChildProfessionInfo()
     local craftingTasks = groupedThingsToCraft[professionInfo.profession]
     if craftingTasks then
-      Array.forEach(craftingTasks, function(craftingTask)
+      for index, craftingTask in ipairs(craftingTasks) do
         print(C_TradeSkillUI.GetRecipeLink(craftingTask.recipeID))
         local amountRemainingToCraft = craftingTask.amount
         print("learned", craftingTask.recipeData.learned)
@@ -431,6 +423,11 @@ craftPlannedButton:SetScript("OnClick", function()
         DevTools_Dump(craftingTask.recipeData.reagentData
           :GetRequiredCraftingReagentInfoTbl())
         if craftableAmount >= 1 then
+          local listener
+          listener = Events.listenForEvent("TRADE_SKILL_CLOSE", function()
+            CraftAndSellInAH.cancel()
+            listener:stopListening()
+          end)
           C_TradeSkillUI.OpenRecipe(craftingTask.recipeData.recipeID)
           craftingTask.recipeData.professionGearSet:Equip()
           Coroutine.waitFor(function()
@@ -458,24 +455,33 @@ craftPlannedButton:SetScript("OnClick", function()
                 local events = {
                   "UPDATE_TRADESKILL_CAST_STOPPED",
                   "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_FAILED",
-                  "TRADE_SKILL_CLOSE",
+                  "TRADE_SKILL_CLOSE", "UNIT_SPELLCAST_FAILED_QUIET",
                 }
                 if amountToCraft == 1 then
                   Array.append(events, { "UNIT_SPELLCAST_SUCCEEDED",
                     "UNIT_SPELLCAST_STOP", })
                 end
-                event = Events.waitForOneOfEvents(events)
+                event = Events.waitForOneOfEventsAndCondition(events,
+                  function(event, unitTarget)
+                    if (event == "UNIT_SPELLCAST_FAILED_QUIET" or event == "UNIT_SPELLCAST_INTERRUPTED" or event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_STOP") and unitTarget == "player" then
+                      return true
+                    else
+                      return true
+                    end
+                  end)
                 print(2)
                 if event == "TRADE_SKILL_CLOSE" then
                   return
                 end
+              else
+                return
               end
             else
               break
             end
           end
         end
-      end)
+      end
       print("Through the list.")
     end
   end)
