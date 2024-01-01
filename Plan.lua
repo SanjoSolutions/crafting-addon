@@ -159,7 +159,7 @@ function _.findRecipesToCraft()
         local recipeData = AddOn.determineRecipeData(recipe.recipeID)
 
         if recipeData then
-          local window = 3 -- hour
+          local window = 1 -- hour
           local amountToCraft
           if recipeData.supportsQualities then
             Array.create(Object.entries(recipeData
