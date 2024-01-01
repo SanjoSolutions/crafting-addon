@@ -436,7 +436,12 @@ craftPlannedButton:SetScript("OnClick", function()
           Coroutine.waitFor(function()
             return CraftSim.TOPGEAR.IsEquipping == false
           end)
+          local event
           while amountRemainingToCraft >= 1 do
+            if event == "UPDATE_TRADESKILL_CAST_STOPPED" or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_STOP" then
+              -- Wait a bit so that item counts are up to date.
+              Coroutine.waitForDuration(1)
+            end
             local canCraft, craftableAmount = craftingTask.recipeData:CanCraft(
               amountRemainingToCraft)
             print("craftableAmount", craftableAmount)
@@ -459,7 +464,7 @@ craftPlannedButton:SetScript("OnClick", function()
                   Array.append(events, { "UNIT_SPELLCAST_SUCCEEDED",
                     "UNIT_SPELLCAST_STOP", })
                 end
-                local event = Events.waitForOneOfEvents(events)
+                event = Events.waitForOneOfEvents(events)
                 print(2)
                 if event == "TRADE_SKILL_CLOSE" then
                   return
@@ -471,6 +476,7 @@ craftPlannedButton:SetScript("OnClick", function()
           end
         end
       end)
+      print("Through the list.")
     end
   end)
 end)
