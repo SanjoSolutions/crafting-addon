@@ -150,7 +150,8 @@ function _.findRecipesToCraft()
       if recipe.recipeInfo.learned then
         local recipeData = AddOn.determineRecipeData(recipe.recipeID)
 
-        if recipeData and recipeData:GetAverageProfit() > 0 then
+        if recipeData and not Array.any(C_TradeSkillUI.GetRecipeRequirements(recipeData.recipeID), function(
+            requirement) return requirement.name == "Earth-Warder's Forge" end) and recipeData:GetAverageProfit() > 0 then
           local window = 1 -- hour
           local amountToCraft
           if recipeData.supportsQualities then
@@ -462,9 +463,10 @@ craftPlannedButton:SetScript("OnClick", function()
                     "UNIT_SPELLCAST_STOP", })
                 end
                 event = Events.waitForOneOfEventsAndCondition(events,
-                  function(event, unitTarget)
-                    if (event == "UNIT_SPELLCAST_FAILED_QUIET" or event == "UNIT_SPELLCAST_INTERRUPTED" or event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_STOP") and unitTarget == "player" then
-                      return true
+                  function(self, event, unitTarget)
+                    print("event", event, unitTarget)
+                    if event == "UNIT_SPELLCAST_FAILED_QUIET" or event == "UNIT_SPELLCAST_INTERRUPTED" or event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_STOP" then
+                      return unitTarget == "player"
                     else
                       return true
                     end
