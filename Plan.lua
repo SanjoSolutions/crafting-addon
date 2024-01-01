@@ -150,7 +150,7 @@ function _.findRecipesToCraft()
       if recipe.recipeInfo.learned then
         local recipeData = AddOn.determineRecipeData(recipe.recipeID)
 
-        if recipeData then
+        if recipeData and recipeData:GetAverageProfit() > 0 then
           local window = 1 -- hour
           local amountToCraft
           if recipeData.supportsQualities then
@@ -181,7 +181,7 @@ function _.findRecipesToCraft()
                 end
               end
             end)
-          else
+          elseif recipeData.resultData.itemsByQuality[1] then -- skips recrafting
             local item = recipeData.resultData.itemsByQuality[1]
             AddOn.loadItem(item)
             local amountSoldPerDay = TSM_API.GetCustomPriceValue(

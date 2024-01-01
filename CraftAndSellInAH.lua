@@ -344,40 +344,13 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
 end
 
 function AddOn.determineRecipeData(recipeID)
-  local recipeData = nil
-
-  local averageProfit
-  local recipeData1
-  do
-    recipeData1 = CraftSim.RecipeData(recipeID, false, false)
-    -- FIXME: With CraftSim freshly installed, this seems to throw an error. It seems required to open the profession window once to fix the error.
-    recipeData1:SetEquippedProfessionGearSet()
-    recipeData1:OptimizeProfit(false)
-    averageProfit = recipeData1:GetAverageProfit()
-  end
-
-  local averageProfitWithInspiration
-  local recipeData2
-  do
-    recipeData2 = CraftSim.RecipeData(recipeID, false, false)
-    recipeData2:SetEquippedProfessionGearSet()
-    recipeData2:OptimizeProfit(true)
-    averageProfitWithInspiration = recipeData2:GetAverageProfit()
-  end
-
-  if averageProfit > 0 or averageProfitWithInspiration > 0 then
-    if averageProfit >= averageProfitWithInspiration then
-      recipeData = recipeData1
-    else
-      recipeData = recipeData2
-    end
-  end
-
-  if recipeData then
-    -- When the profession window for the profession is closed this might be set to false by CraftSim even though the recipe is learned.
-    -- We set it here to true so that CanCraft correctly works.
-    recipeData.learned = true
-  end
+  local recipeData = CraftSim.RecipeData(recipeID, false, false)
+  -- FIXME: With CraftSim freshly installed, this seems to throw an error. It seems required to open the profession window once to fix the error.
+  recipeData:SetEquippedProfessionGearSet()
+  recipeData:OptimizeProfit()
+  -- When the profession window for the profession is closed this might be set to false by CraftSim even though the recipe is learned.
+  -- We set it here to true so that CanCraft correctly works.
+  recipeData.learned = true
 
   return recipeData
 end
@@ -666,8 +639,9 @@ end
 --- @param craftingTasks CraftingTask[]
 --- @return ThingToRetrieve[]
 function _.determineThingsToRetrieve(craftingTasks)
-  local thingsToRetrieve = _.sum(Array.flatMap(craftingTasks,
-    _.determineThingsToRetrieveForCraftingTask))
+  local thingsToRetrieve = _.sum(Array.flat(Array.selectTrue(Array.map(
+    craftingTasks,
+    _.determineThingsToRetrieveForCraftingTask))))
   Array.forEach(thingsToRetrieve, function(thingToRetrieve)
     thingToRetrieve.amount = math.max(
       thingToRetrieve.amount -
@@ -690,36 +664,45 @@ function _.determineThingsToRetrieve(craftingTasks)
 end
 
 --- @param craftingTask CraftingTask
+--- @return ThingToRetrieve[]|nil
 function _.determineThingsToRetrieveForCraftingTask(craftingTask)
   local thingsRequiredForCraft = _.determineThingsRequiredForCraftingTask(
     craftingTask)
   local thingsToRetrieveForThing = {}
 
-  Array.forEach(thingsRequiredForCraft, function(thingRequiredForThing)
+  for index, thingRequiredForThing in ipairs(thingsRequiredForCraft) do
     local itemLinks = thingRequiredForThing.itemLinks:toList()
+    --- @type Array
     local itemsWithPrices = Array.map(itemLinks, function(itemLink)
       local item = {
         itemLink = itemLink,
         price = _.determineAuctionHousePrice(AddOn.createItem(itemLink)),
       }
       return item
+    end):filter(function(item)
+      return item.price ~= nil
     end)
-    local itemWithLowestPrice = Array.min(itemsWithPrices,
-      function(itemWithPrice)
-        return itemWithPrice.price
+    if itemsWithPrices:hasElements() then
+      local itemWithLowestPrice = Array.min(itemsWithPrices,
+        function(itemWithPrice)
+          return itemWithPrice.price
+        end)
+      -- FIXME: Is this compatible with CraftSim RecipeData (only a specific configuration of reagents)?
+      local selectedItems = Array.filter(itemsWithPrices, function(itemWithPrice)
+        return itemWithPrice.price <= itemWithLowestPrice.price
       end)
-    local selectedItems = Array.filter(itemsWithPrices, function(itemWithPrice)
-      return itemWithPrice.price <= itemWithLowestPrice.price
-    end)
-    local amount = thingRequiredForThing.amount
-    local thingToRetrieveForThing = Object.assign({}, thingRequiredForThing, {
-      itemLinks = Set.create(Array.map(selectedItems, function(item)
-        return item.itemLink
-      end)),
-      amount = amount,
-    })
-    table.insert(thingsToRetrieveForThing, thingToRetrieveForThing)
-  end)
+      local amount = thingRequiredForThing.amount
+      local thingToRetrieveForThing = Object.assign({}, thingRequiredForThing, {
+        itemLinks = Set.create(Array.map(selectedItems, function(item)
+          return item.itemLink
+        end)),
+        amount = amount,
+      })
+      table.insert(thingsToRetrieveForThing, thingToRetrieveForThing)
+    else
+      return nil
+    end
+  end
 
   return thingsToRetrieveForThing
 end
@@ -846,46 +829,6 @@ function _.determineThingsRequiredPerCraftingTask(craftingTask)
   end
 
   return thingsToBuy
-end
-
-function _.determineOptimalWayToCraft(thingToCraft)
-  local isCooking = recipeData.professionID == Enum.Profession.Cooking
-  local gearCombos = CraftSim.TOPGEAR:GetProfessionGearCombinations(isCooking)
-  if gearCombos then
-    local exportMode = CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER
-    local recipeData = CraftSim.DATAEXPORT:exportRecipeData(
-      thingToCraft.recipeID, exportMode)
-    if recipeData then
-      local recipeType = recipeData.recipeType
-      local priceData = CraftSim.PRICEDATA:GetPriceData(recipeData, recipeType)
-      local noItemsRecipeData = CraftSim.TOPGEAR:DeductCurrentItemStats(
-        recipeData, recipeType)
-      local simulationResults = _.simulateProfessionGearCombinations(gearCombos,
-        noItemsRecipeData,
-        recipeType, priceData)
-    end
-  end
-end
-
-function _.simulateProfessionGearCombinations(gearCombos, recipeData, recipeType,
-  priceData)
-  local results = {}
-
-  for __, gearCombination in pairs(gearCombos) do
-    local statChanges = CraftSim.TOPGEAR:GetStatChangesFromGearCombination(
-      gearCombination)
-    local modifiedRecipeData = CraftSim.TOPGEAR
-      :GetModifiedRecipeDataByStatChanges(recipeData, recipeType, statChanges)
-    -- TODO: Optimize material choices to maximize profit. Seem only relevant if the inspiration stat changes.
-    local meanProfit = CraftSim.CALC:getMeanProfit(modifiedRecipeData, priceData)
-    table.insert(results, {
-      meanProfit = meanProfit,
-      combo = gearCombination,
-      modifiedRecipeData = modifiedRecipeData,
-    })
-  end
-
-  return results
 end
 
 -- /dump C_TradeSkillUI.GetRecipeInfo(ProfessionsFrame.CraftingPage.SchematicForm.currentRecipeInfo.recipeID)
