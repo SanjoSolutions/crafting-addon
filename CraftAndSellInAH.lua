@@ -2,6 +2,8 @@
 
 CraftAndSellInAH = {}
 
+CraftAndSellInAH.auctionHousePriceSource = "Auctionator" -- or TSM
+
 --- @class AddOn
 local AddOn = select(2, ...)
 --- @class _
@@ -176,10 +178,15 @@ end
 --- @param item Item
 --- @return number
 function _.determineAuctionHousePrice(item)
-  local itemString = AddOn.generateItemString(item)
-  local ahPrice = TSM_API.GetCustomPriceValue("DBRecent", itemString)
-  if ahPrice == nil then
-    ahPrice = TSM_API.GetCustomPriceValue("DBMarket", itemString)
+  if CraftAndSellInAH.auctionHousePriceSource == "TSM" then
+    local itemString = AddOn.generateItemString(item)
+    local ahPrice = TSM_API.GetCustomPriceValue("DBRecent", itemString)
+    if ahPrice == nil then
+      ahPrice = TSM_API.GetCustomPriceValue("DBMarket", itemString)
+    end
+  elseif CraftAndSellInAH.auctionHousePriceSource == "Auctionator" then
+    ahPrice = Auctionator.API.v1.GetAuctionPriceByItemLink("Crafting",
+      item:GetItemLink())
   end
 
   return ahPrice
@@ -547,7 +554,7 @@ end
 --- @param item Item
 function _.determineBreakEvenPrice(item)
   local recipe = _.retrieveRecipeForItem(item:GetItemID())
-  local recipeData = CraftSim.RecipeData(recipe.recipeID, false, false)
+  local recipeData = AddOn.determineRecipeData(recipe.recipeID)
   local averageAmountProduced = AddOn.determineAverageAmountProducedByRecipe(
     recipeData)
   local averageProfit = recipeData:GetAverageProfit()
@@ -1044,7 +1051,7 @@ end
 function _.determineAverageAmountProduced(item)
   local recipe = _.retrieveRecipeForItem(item.id)
   if recipe then
-    local recipeData = CraftSim.RecipeData(recipe.recipeID, false, false)
+    local recipeData = AddOn.determineRecipeData(recipe.recipeID)
     return AddOn.determineAverageAmountProducedByRecipe(recipeData)
   else
     return nil
@@ -1205,6 +1212,5 @@ end
 
 --- @param item Item
 function AddOn.determineAuctionHouseBuyPrice(item)
-  local itemString = AddOn.generateItemString(item)
-  return TSM_API.GetCustomPriceValue("DBRecent", itemString)
+  return _.determineAuctionHousePrice(item)
 end

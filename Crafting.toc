@@ -2,6 +2,7 @@
 ## Version: 0.1.0
 ## Interface: 100200
 ## Dependencies: TradeSkillMaster, CraftSim, Blizzard_AuctionHouseUI
+## OptionalDeps: Auctionator
 ## SavedVariables: CraftingSavedVariables
 ## SavedVariablesPerCharacter: CraftingSavedVariablesPerCharacter
 

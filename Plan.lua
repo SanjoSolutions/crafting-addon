@@ -368,16 +368,20 @@ end
 function _.main()
   _.initializeSavedVariables()
 
-  local ticker
-  ticker = C_Timer.NewTicker(1, function()
-    -- Render after the price data from TSM has been loaded.
-    local isPriceDataLoaded = Boolean.toBoolean(TSM_API.GetCustomPriceValue(
-      "DBMarket", "i:190396"))
-    if isPriceDataLoaded then
-      ticker:Cancel()
-      Coroutine.runAsCoroutine(_.update)
-    end
-  end)
+  if CraftAndSellInAH.auctionHousePriceSource == "TSM" then
+    local ticker
+    ticker = C_Timer.NewTicker(1, function()
+      -- Render after the price data from TSM has been loaded.
+      local isPriceDataLoaded = Boolean.toBoolean(TSM_API.GetCustomPriceValue(
+        "DBMarket", "i:190396"))
+      if isPriceDataLoaded then
+        ticker:Cancel()
+        Coroutine.runAsCoroutine(_.update)
+      end
+    end)
+  else
+    Coroutine.runAsCoroutine(_.update)
+  end
 end
 
 function _.initializeSavedVariables()
