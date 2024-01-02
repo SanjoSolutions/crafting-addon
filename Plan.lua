@@ -147,7 +147,7 @@ function _.findRecipesToCraft()
 
   Array.forEach(Object.values(CraftingSavedVariablesPerCharacter.recipes),
     function(recipe)
-      if recipe.recipeInfo.learned then
+      if recipe.recipeInfo.learned and recipe.profession ~= 5 then -- other than cooking
         local recipeData = AddOn.determineRecipeData(recipe.recipeID)
 
         if recipeData and not Array.any(C_TradeSkillUI.GetRecipeRequirements(recipeData.recipeID), function(
@@ -442,8 +442,10 @@ craftPlannedButton:SetScript("OnClick", function()
           end)
           local event
           while amountRemainingToCraft >= 1 do
+            print("event2", event)
             if event == "UPDATE_TRADESKILL_CAST_STOPPED" or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_STOP" then
               -- Wait a bit so that item counts are up to date.
+              print("wait a bit")
               Coroutine.waitForDuration(1)
             end
             local canCraft, craftableAmount = craftingTask.recipeData:CanCraft(
@@ -456,31 +458,43 @@ craftPlannedButton:SetScript("OnClick", function()
                 " x " ..
                 C_TradeSkillUI.GetRecipeLink(craftingTask.recipeID) .. ".")
               if CraftAndSellInAH.showConfirmButton() then
-                craftingTask.recipeData:Craft(amountToCraft)
-                amountRemainingToCraft = amountRemainingToCraft - amountToCraft
-                print(1)
-                local events = {
-                  "UPDATE_TRADESKILL_CAST_STOPPED",
-                  "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_FAILED",
-                  "TRADE_SKILL_CLOSE", "UNIT_SPELLCAST_FAILED_QUIET",
-                }
-                if amountToCraft == 1 then
-                  Array.append(events, { "UNIT_SPELLCAST_SUCCEEDED",
-                    "UNIT_SPELLCAST_STOP", })
-                end
-                event = Events.waitForOneOfEventsAndCondition(events,
-                  function(self, event, unitTarget)
-                    print("event", event, unitTarget)
-                    if event == "UNIT_SPELLCAST_FAILED_QUIET" or event == "UNIT_SPELLCAST_INTERRUPTED" or event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_STOP" then
-                      return unitTarget == "player"
-                    else
-                      return true
+                local hasSpellCastFailed = false
+                local listener2 = Events.listenForEvent("UNIT_SPELLCAST_FAILED",
+                  function(event, unitTarget)
+                    if unitTarget == "player" then
+                      hasSpellCastFailed = true
                     end
                   end)
-                print(2)
-                if event == "TRADE_SKILL_CLOSE" then
-                  return
+                craftingTask.recipeData:Craft(amountToCraft)
+                if not hasSpellCastFailed then
+                  print(1)
+                  local events = {
+                    "UPDATE_TRADESKILL_CAST_STOPPED",
+                    "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_FAILED",
+                    "TRADE_SKILL_CLOSE", "UNIT_SPELLCAST_FAILED_QUIET",
+                  }
+                  if amountToCraft == 1 then
+                    Array.append(events, { "UNIT_SPELLCAST_SUCCEEDED",
+                      "UNIT_SPELLCAST_STOP", })
+                  end
+                  event = select(2, Events.waitForOneOfEventsAndCondition(events,
+                    function(self, event, unitTarget)
+                      print("event", event, unitTarget)
+                      if event == "UNIT_SPELLCAST_FAILED_QUIET" or event == "UNIT_SPELLCAST_INTERRUPTED" or event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_STOP" then
+                        return unitTarget == "player"
+                      else
+                        return true
+                      end
+                    end))
+                  print(2)
+                  if event == "TRADE_SKILL_CLOSE" then
+                    return
+                  elseif event == "UPDATE_TRADESKILL_CAST_STOPPED" or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_STOP" then
+                    amountRemainingToCraft = amountRemainingToCraft -
+                      amountToCraft
+                  end
                 end
+                listener2:stopListening()
               else
                 return
               end
