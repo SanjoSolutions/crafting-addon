@@ -42,7 +42,7 @@ local CraftSim = CraftSim_DEBUG:RUN()
 --- @field amount Amount
 --- @field recipeData CraftSim.RecipeData
 
---- @class ThingToRetrieve
+--- @class ThingRequired
 --- @field itemLinks Set
 --- @field amount number
 
@@ -64,11 +64,11 @@ AddOn.SourceType = {
   ReagentBank = 10,
 }
 
---- @class ItemRetrievalEntry
+--- @class BestSourcesEntry
 --- @field itemLink ItemLink
 --- @field amount Amount
 
---- @alias BestSources { [SourceType]: ItemRetrievalEntry[] }
+--- @alias BestSources { [SourceType]: BestSourcesEntry[] }
 
 --- @alias Groups { [SourceType]: { [ItemLink]: ItemToRetrieve } }
 
@@ -108,6 +108,9 @@ local sourceTypeToName = {
   [AddOn.SourceType.OtherCharacter] = "other character",
   [AddOn.SourceType.Mail] = "mail",
   [AddOn.SourceType.Otherwise] = "otherwise",
+  [AddOn.SourceType.Bag] = "bag",
+  [AddOn.SourceType.Bank] = "bank",
+  [AddOn.SourceType.ReagentBank] = "reagent bank",
 }
 
 function AddOn.generatePlanText(input, thingsToRetrieve, groupedThingsToCraft)
@@ -234,7 +237,8 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
       end
     end):selectTrue())
 
-  _.determineRetrievalsForCrafts(_.convertCraftingTasksMapToArray(craftingTasks),
+  _.determineReagentSourcesForCrafts(
+    _.convertCraftingTasksMapToArray(craftingTasks),
     groups,
     inventory)
 
@@ -291,7 +295,7 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
       end
     end
     groups[AddOn.SourceType.Crafting] = nil
-    _.determineRetrievalsForCrafts(
+    _.determineReagentSourcesForCrafts(
       _.convertCraftingTasksMapToArray(furtherCrafts),
       groups,
       inventory
@@ -610,29 +614,31 @@ end
 --- @param craftingTasks CraftingTask[]
 --- @param groups Groups
 --- @param inventory Inventory
-function _.determineRetrievalsForCrafts(craftingTasks, groups, inventory)
-  local thingsToRetrieve = _.determineThingsToRetrieve(craftingTasks)
+function _.determineReagentSourcesForCrafts(craftingTasks, groups, inventory)
+  local thingsRequired = _.determineThingsRequiredForCraftingTasks(
+    craftingTasks)
 
-  Array.forEach(thingsToRetrieve, function(thingToRetrieve)
-    Array.forEach(thingToRetrieve.itemLinks:toList(), function(itemLink)
+  Array.forEach(thingsRequired, function(thingRequired)
+    Array.forEach(thingRequired.itemLinks:toList(), function(itemLink)
       _.addItemToInventory(inventory, AddOn.createItem(itemLink))
     end)
   end)
 
-  Array.forEach(thingsToRetrieve, function(thingToRetrieve)
-    local bestSources = AddOn.determineBestSourcesToRetrieveThingFrom(inventory,
-      thingToRetrieve)
-    for source, itemRetrievalEntries in pairs(bestSources) do
+
+  Array.forEach(thingsRequired, function(thingRequired)
+    local bestSources = AddOn.determineBestSourcesForThing(inventory,
+      thingRequired)
+    for source, entries in pairs(bestSources) do
       if not groups[source] then
         groups[source] = {}
       end
-      Array.forEach(itemRetrievalEntries, function(itemRetrievalEntry)
-        local itemLink = itemRetrievalEntry.itemLink
+      Array.forEach(entries, function(entry)
+        local itemLink = entry.itemLink
         if groups[source][itemLink] then
           groups[source][itemLink].amount = groups[source][itemLink].amount +
-            itemRetrievalEntry.amount
+            entry.amount
         else
-          groups[source][itemLink] = Object.copy(itemRetrievalEntry)
+          groups[source][itemLink] = Object.copy(entry)
         end
       end)
     end
@@ -640,37 +646,11 @@ function _.determineRetrievalsForCrafts(craftingTasks, groups, inventory)
 end
 
 --- @param craftingTasks CraftingTask[]
---- @return ThingToRetrieve[]
-function _.determineThingsToRetrieve(craftingTasks)
-  local thingsToRetrieve = _.sum(Array.flat(Array.selectTrue(Array.map(
+--- @return ThingRequired[]
+function _.determineThingsRequiredForCraftingTasks(craftingTasks)
+  return _.sum(Array.flat(Array.selectTrue(Array.map(
     craftingTasks,
-    _.determineThingsToRetrieveForCraftingTask))))
-  Array.forEach(thingsToRetrieve, function(thingToRetrieve)
-    thingToRetrieve.amount = math.max(
-      thingToRetrieve.amount -
-      Mathematics.sum(Array.map(thingToRetrieve.itemLinks:toList(),
-        function(itemLink)
-          local item = AddOn.createItem(itemLink)
-          local itemString = AddOn.generateItemString(item)
-          -- Reagents from those sources can directly be used for crafting.
-          local amount = TSM_API.GetBagQuantity(itemString) +
-            TSM_API.GetBankQuantity(itemString) +
-            TSM_API.GetReagentBankQuantity(itemString)
-          return amount
-        end)), 0)
-  end)
-  --- @type ThingToRetrieve[]
-  thingsToRetrieve = Array.filter(thingsToRetrieve, function(thingToRetrieve)
-    return thingToRetrieve.amount >= 1
-  end)
-  return thingsToRetrieve
-end
-
---- @param craftingTask CraftingTask
---- @return ThingToRetrieve[]
-function _.determineThingsToRetrieveForCraftingTask(craftingTask)
-  return _.determineThingsRequiredForCraftingTask(
-    craftingTask)
+    _.determineThingsRequiredForCraftingTask))))
 end
 
 function _.determineMinimumQualityRequiredForCraft(thingToCraft)
@@ -711,7 +691,7 @@ function ThingRequired.create(data)
 end
 
 --- @param craftingTask CraftingTask
---- @return ThingToRetrieve[]
+--- @return ThingRequired[]
 function _.determineThingsRequiredForCraftingTask(craftingTask)
   local thingsRequiredForThing = {}
   local thingsRequiredPerThing = _.determineThingsRequiredPerCraftingTask(
@@ -728,12 +708,12 @@ function _.determineThingsRequiredForCraftingTask(craftingTask)
 end
 
 --- @param craftingTask CraftingTask
---- @return ThingToRetrieve[]
+--- @return ThingRequired[]
 function _.determineThingsRequiredPerCraftingTask(craftingTask)
   local recipeID = craftingTask.recipeID
   local recipeSchematic = C_TradeSkillUI.GetRecipeSchematic(recipeID, false)
   local reagentSlotSchematics = recipeSchematic.reagentSlotSchematics
-  --- @type ThingToRetrieve[]
+  --- @type ThingRequired[]
   local thingsToRetrieve = {}
 
   Array.forEach(reagentSlotSchematics, function(reagentSlotSchematic)
@@ -872,8 +852,8 @@ function _.retrieveRecipeIDForItem(itemID)
   return CraftingSavedVariables.itemIDToRecipeID[itemID]
 end
 
---- @param thingsToRetrieve ThingToRetrieve[]
---- @return ThingToRetrieve[]
+--- @param thingsToRetrieve ThingRequired[]
+--- @return ThingRequired[]
 function _.sum(thingsToRetrieve)
   local totalThingsToRetrieve = {}
   local lookup = {}
@@ -1110,19 +1090,19 @@ function _.retrieveFromInventoryFromSource(inventory, itemLink, source, amount)
 end
 
 --- @param inventory Inventory
---- @param thingToRetrieve ThingToRetrieve
+--- @param thing ThingRequired
 --- @return BestSources
-function AddOn.determineBestSourcesToRetrieveThingFrom(inventory, thingToRetrieve)
+function AddOn.determineBestSourcesForThing(inventory, thing)
   --- @type BestSources
   local bestSources = {}
 
-  local itemLinks = thingToRetrieve.itemLinks:toList()
+  local itemLinks = thing.itemLinks:toList()
   Array.map(itemLinks, function(itemLink)
     AddOn.loadItem(AddOn.createItem(itemLink))
   end)
   table.sort(itemLinks, _.compareQuality)
 
-  local amountLeft = thingToRetrieve.amount
+  local amountLeft = thing.amount
 
   for __, itemLink in ipairs(itemLinks) do
     local retrieval = _.retrieveFromInventory(inventory, itemLink, amountLeft)
@@ -1142,7 +1122,6 @@ function AddOn.determineBestSourcesToRetrieveThingFrom(inventory, thingToRetriev
 
     -- other sources
     if amountLeft >= 1 then
-      local item2 = Item:CreateFromItemLink(itemLink)
       local item = {
         itemLink = itemLink,
         recipeID = _.retrieveRecipeIDForItem(itemLink),
