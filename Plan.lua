@@ -26,7 +26,7 @@ local planDisplay = ChatFrame5
 
 --- @type ThingsToRetrieveStepsList
 local thingsToRetrieve
---- @type GroupedThingsToCraft
+--- @type GroupedThingsToCraftWithProgress
 local groupedThingsToCraft
 
 local isAuctionHouseOpen = AuctionHouseFrame:IsShown()
@@ -54,7 +54,19 @@ function _.update()
 
   thingsToRetrieve, groupedThingsToCraft = AddOn.determineThingsToRetrieve(
     input)
-  local planText = AddOn.generatePlanText(input, thingsToRetrieve,
+  for source, craftingTasks in pairs(groupedThingsToCraft) do
+    for index, craftingTask in ipairs(craftingTasks) do
+      local craftingTaskWithProgress = AddOn.CraftingTaskWithProgress:new(
+        craftingTask)
+      craftingTaskWithProgress.amountCrafted = 0
+      craftingTasks[index] = craftingTaskWithProgress
+    end
+  end
+  _.updatePlanText()
+end
+
+function _.updatePlanText()
+  local planText = AddOn.generatePlanText(thingsToRetrieve,
     groupedThingsToCraft)
   AddOn.showText(planDisplay, planText)
 end
@@ -109,7 +121,6 @@ buyButton:SetScript("OnClick", function()
       }
     end)
     AddOn.buy(buyTasks)
-    _.update()
   end)
 end)
 
@@ -426,9 +437,8 @@ craftPlannedButton:SetScript("OnClick", function()
     if craftingTasks then
       for index, craftingTask in ipairs(craftingTasks) do
         print(C_TradeSkillUI.GetRecipeLink(craftingTask.recipeID))
-        local amountRemainingToCraft = craftingTask.amount
         local canCraft, craftableAmount = craftingTask.recipeData:CanCraft(
-          amountRemainingToCraft)
+          craftingTask:determineAmountRemainingToCraft())
         DevTools_Dump(craftingTask.recipeData.reagentData:Debug())
         if craftableAmount >= 1 then
           local listener
@@ -442,7 +452,7 @@ craftPlannedButton:SetScript("OnClick", function()
             return CraftSim.TOPGEAR.IsEquipping == false
           end)
           local event
-          while amountRemainingToCraft >= 1 do
+          while craftingTask:determineAmountRemainingToCraft() >= 1 do
             print("event2", event)
             if event == "UPDATE_TRADESKILL_CAST_STOPPED" or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_STOP" then
               -- Wait a bit so that item counts are up to date.
@@ -450,7 +460,7 @@ craftPlannedButton:SetScript("OnClick", function()
               Coroutine.waitForDuration(1)
             end
             local canCraft, craftableAmount = craftingTask.recipeData:CanCraft(
-              amountRemainingToCraft)
+              craftingTask:determineAmountRemainingToCraft())
             print("craftableAmount", craftableAmount)
             if craftableAmount >= 1 then
               local amountToCraft = min(craftableAmount, craftingTask.amount)
@@ -466,12 +476,13 @@ craftPlannedButton:SetScript("OnClick", function()
                       hasSpellCastFailed = true
                     end
                   end)
-                local numberOfCrafts = 0
                 local listener3 = Events.listenForEvent(
                   "UNIT_SPELLCAST_SUCCEEDED",
                   function(event, unitTarget, castGUID, spellID)
                     if unitTarget == "player" and spellID == craftingTask.recipeID then
-                      numberOfCrafts = numberOfCrafts + 1
+                      craftingTask.amountCrafted = craftingTask.amountCrafted +
+                        1
+                      _.updatePlanText()
                     end
                   end)
                 craftingTask.recipeData:Craft(amountToCraft)
@@ -500,9 +511,6 @@ craftPlannedButton:SetScript("OnClick", function()
                     listener2:stopListening()
                     listener3:stopListening()
                     return
-                  elseif event == "UPDATE_TRADESKILL_CAST_STOPPED" or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_STOP" then
-                    amountRemainingToCraft = amountRemainingToCraft -
-                      numberOfCrafts
                   end
                 end
                 listener2:stopListening()

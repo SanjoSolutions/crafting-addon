@@ -42,8 +42,24 @@ local CraftSim = CraftSim_DEBUG:RUN()
 --- @field amount Amount
 --- @field recipeData CraftSim.RecipeData
 
+--- @class CraftingTaskWithProgress: CraftingTask
+--- @field amountCrafted Amount
+AddOn.CraftingTaskWithProgress = {}
+
+--- @return CraftingTaskWithProgress
+function AddOn.CraftingTaskWithProgress:new(data)
+  local craftingTaskWithProgress = data or {}
+  setmetatable(craftingTaskWithProgress, self)
+  self.__index = self
+  return craftingTaskWithProgress
+end
+
+function AddOn.CraftingTaskWithProgress:determineAmountRemainingToCraft()
+  return self.amount - self.amountCrafted
+end
+
 --- @class ThingRequired
---- @field itemLinks Set
+--- @field itemLink ItemLink
 --- @field amount number
 
 --- @class ItemToRetrieve
@@ -92,6 +108,7 @@ AddOn.Profession = {
 }
 
 --- @alias GroupedThingsToCraft { [Profession]: CraftingTask[] }
+--- @alias GroupedThingsToCraftWithProgress { [Profession]: CraftingTaskWithProgress[] }
 
 --- @class PurchaseTask
 --- @field itemLink ItemLink
@@ -117,7 +134,9 @@ local sourceTypeToName = {
   [AddOn.SourceType.ReagentBank] = "reagent bank",
 }
 
-function AddOn.generatePlanText(input, thingsToRetrieve, groupedThingsToCraft)
+--- @param thingsToRetrieve ThingsToRetrieveStep[]
+--- @param groupedThingsToCraft GroupedThingsToCraftWithProgress
+function AddOn.generatePlanText(thingsToRetrieve, groupedThingsToCraft)
   local text = ""
 
   for __, thingToRetrieve in ipairs(thingsToRetrieve) do
@@ -138,13 +157,16 @@ function AddOn.generatePlanText(input, thingsToRetrieve, groupedThingsToCraft)
           .professionName
         text = text .. professionName .. ":\n"
       end
-      Array.forEach(entry.value, function(item, index)
+      Array.forEach(entry.value, function(craftingTaskWithProgress, index)
         text = text ..
           index ..
           ". " ..
-          item.amount ..
+          craftingTaskWithProgress.amount ..
           " x " ..
-          C_TradeSkillUI.GetRecipeLink(item.recipeID) .. "\n"
+          C_TradeSkillUI.GetRecipeLink(craftingTaskWithProgress.recipeID) ..
+          " (" ..
+          craftingTaskWithProgress.amountCrafted ..
+          " / " .. craftingTaskWithProgress.amount .. ")\n"
       end)
     end)
 
@@ -474,42 +496,64 @@ function _.doSellTask(sellTask)
     end
   end
 
-  local unitPrice
   if event == "COMMODITY_SEARCH_RESULTS_UPDATED" then
-    unitPrice = _.determineUnitPrice(itemID)
+    local unitPrice = _.determineUnitPrice(itemID)
     -- TODO: Handle when unitPrice is nil. (When there is no item of the type in the AH?)
 
-    -- TODO: Make sure that the unit price is high enough so that selling the item for the price is profitable.
+    local breakEvenPrice = _.determineBreakEvenPrice(item)
 
-    local containerIndex, slotIndex = Bags.findItem(itemID)
-    if containerIndex and slotIndex then
-      local item = ItemLocation:CreateFromBagAndSlot(containerIndex, slotIndex)
-      local duration = 1
-      -- TODO: Does it work if the item is distributed over multiple slots?
-      local itemLink = C_Item.GetItemLink(item)
-      print("Trying to put in " ..
-        amount ..
-        " x " .. itemLink .. " (each for " .. GetMoneyString(unitPrice) .. ").")
-      if MoneyMakingAssistant.showConfirmButton() then
-        local requiresConfirmation = C_AuctionHouse.PostCommodity(item, duration,
-          amount, unitPrice)
-        if requiresConfirmation then
-          C_AuctionHouse.ConfirmPostCommodity(item, duration, amount, unitPrice)
-        end
-        -- TODO: Events for error?
-        local wasSuccessful = Events.waitForEvent(
-          "AUCTION_HOUSE_AUCTION_CREATED", 3)
-        if wasSuccessful then
-          print("Have put in " ..
-            amount ..
-            " x " ..
-            itemLink .. " (each for " .. GetMoneyString(unitPrice) .. ").")
-        else
-          print("Error putting in " .. amount .. " x " .. itemLink .. ".")
+    if unitPrice <= breakEvenPrice then
+      local containerIndex, slotIndex = Bags.findItem(itemID)
+      if containerIndex and slotIndex then
+        local item = ItemLocation:CreateFromBagAndSlot(containerIndex, slotIndex)
+        local duration = 1
+        -- TODO: Does it work if the item is distributed over multiple slots?
+        local itemLink = C_Item.GetItemLink(item)
+        print("Trying to put in " ..
+          amount ..
+          " x " .. itemLink .. " (each for " .. GetMoneyString(unitPrice) .. ").")
+        if MoneyMakingAssistant.showConfirmButton() then
+          local requiresConfirmation = C_AuctionHouse.PostCommodity(item,
+            duration,
+            amount, unitPrice)
+          if requiresConfirmation then
+            C_AuctionHouse.ConfirmPostCommodity(item, duration, amount, unitPrice)
+          end
+          -- TODO: Events for error?
+          local wasSuccessful = Events.waitForEvent(
+            "AUCTION_HOUSE_AUCTION_CREATED", 3)
+          if wasSuccessful then
+            print("Have put in " ..
+              amount ..
+              " x " ..
+              itemLink .. " (each for " .. GetMoneyString(unitPrice) .. ").")
+          else
+            print("Error putting in " .. amount .. " x " .. itemLink .. ".")
+          end
         end
       end
+    else
+      print("Skipping to put in " ..
+        amount ..
+        " x " ..
+        item:GetItemLink() ..
+        " because the auction house price is below the break even price (" ..
+        GetMoneyString(unitPrice) ..
+        " < " .. GetMoneyString(breakEvenPrice) .. ").")
     end
   end
+end
+
+--- @param item Item
+function _.determineBreakEvenPrice(item)
+  local recipe = _.retrieveRecipeForItem(item:GetItemID())
+  local recipeData = CraftSim.RecipeData(recipe.recipeID, false, false)
+  local averageAmountProduced = AddOn.determineAverageAmountProducedByRecipe(
+    recipeData)
+  local averageProfit = recipeData:GetAverageProfit()
+  local auctionHousePrice = _.determineAuctionHousePrice(item)
+  local profitPerItem = averageProfit / averageAmountProduced
+  return auctionHousePrice - profitPerItem
 end
 
 function _.determineUnitPrice(itemID)
@@ -623,9 +667,7 @@ function _.determineReagentSourcesForCrafts(craftingTasks, groups, inventory)
     craftingTasks)
 
   Array.forEach(thingsRequired, function(thingRequired)
-    Array.forEach(thingRequired.itemLinks:toList(), function(itemLink)
-      _.addItemToInventory(inventory, AddOn.createItem(itemLink))
-    end)
+    _.addItemToInventory(inventory, AddOn.createItem(thingRequired.itemLink))
   end)
 
 
@@ -678,22 +720,6 @@ function _.determineQualityOfItem(itemID)
   return quality
 end
 
---- @class ThingRequired
---- @field amount number
-local ThingRequired = {}
-
---- @return ThingRequired
-function ThingRequired.create(data)
-  local thingRequired
-  if data then
-    thingRequired = Object.copy(data)
-  else
-    thingRequired = {}
-  end
-  setmetatable(thingRequired, { __index = ThingRequired, })
-  return thingRequired
-end
-
 --- @param craftingTask CraftingTask
 --- @return ThingRequired[]
 function _.determineThingsRequiredForCraftingTask(craftingTask)
@@ -718,7 +744,7 @@ function _.determineThingsRequiredPerCraftingTask(craftingTask)
   local recipeSchematic = C_TradeSkillUI.GetRecipeSchematic(recipeID, false)
   local reagentSlotSchematics = recipeSchematic.reagentSlotSchematics
   --- @type ThingRequired[]
-  local thingsToRetrieve = {}
+  local thingsRequired = {}
 
   Array.forEach(reagentSlotSchematics, function(reagentSlotSchematic)
     if reagentSlotSchematic.reagentType == Enum.CraftingReagentType.Basic then
@@ -729,9 +755,8 @@ function _.determineThingsRequiredPerCraftingTask(craftingTask)
       if #itemIDs == 1 then
         local item = AddOn.createItem(itemIDs[1])
         AddOn.loadItem(item)
-        local itemLink = item:GetItemLink()
-        table.insert(thingsToRetrieve, {
-          itemLinks = Set.create({ itemLink, }),
+        table.insert(thingsRequired, {
+          itemLink = item:GetItemLink(),
           amount = reagentSlotSchematic.quantityRequired,
         })
       elseif #itemIDs >= 2 then
@@ -748,9 +773,8 @@ function _.determineThingsRequiredPerCraftingTask(craftingTask)
           local quantity = item.quantity
           if quantity > 0 then
             AddOn.loadItem(item.item)
-            local itemLink = item.item:GetItemLink()
-            table.insert(thingsToRetrieve, {
-              itemLinks = Set.create({ itemLink, }),
+            table.insert(thingsRequired, {
+              itemLink = item.item:GetItemLink(),
               amount = quantity,
             })
           end
@@ -758,20 +782,8 @@ function _.determineThingsRequiredPerCraftingTask(craftingTask)
       end
     end
   end)
-  if craftingTask.missiveIDs then
-    local recipeID
-    if Array.hasElements(craftingTask.missiveIDs) then
-      recipeID = _.retrieveRecipeIDForItem(craftingTask.missiveIDs[1])
-    else
-      recipeID = nil
-    end
-    table.insert(thingsToRetrieve, {
-      itemLinks = Array.map(craftingTask.missiveIDs, _.convertItemIDToItemLink),
-      amount = 1,
-    })
-  end
 
-  return thingsToRetrieve
+  return thingsRequired
 end
 
 -- /dump C_TradeSkillUI.GetRecipeInfo(ProfessionsFrame.CraftingPage.SchematicForm.currentRecipeInfo.recipeID)
@@ -856,27 +868,23 @@ function _.retrieveRecipeIDForItem(itemID)
   return CraftingSavedVariables.itemIDToRecipeID[itemID]
 end
 
---- @param thingsToRetrieve ThingRequired[]
+--- @param thingsRequired ThingRequired[]
 --- @return ThingRequired[]
-function _.sum(thingsToRetrieve)
+function _.sum(thingsRequired)
   local totalThingsToRetrieve = {}
   local lookup = {}
-  Array.forEach(thingsToRetrieve, function(thingToBuy)
-    local firstItemLink = thingToBuy.itemLinks:toList()[1]
-    local entry = lookup[firstItemLink]
+  Array.forEach(thingsRequired, function(thingRequired)
+    local itemLink = thingRequired.itemLink
+    local entry = lookup[itemLink]
     if entry then
-      entry.amount = entry.amount + thingToBuy.amount
+      entry.amount = entry.amount + thingRequired.amount
     else
-      local entry = Object.copy(thingToBuy)
+      local entry = Object.copy(thingRequired)
       table.insert(totalThingsToRetrieve, entry)
-      lookup[firstItemLink] = entry
+      lookup[itemLink] = entry
     end
   end)
   return totalThingsToRetrieve
-end
-
-function _.craftThings(thingsToCraft)
-
 end
 
 function AddOn.generateThingsToRetrieveFromSourceText(sourceType,
@@ -1022,9 +1030,9 @@ function _.determineCraftingCost(item)
       function(item2)
         return item2:GetItemLink() == item:GetItemLink()
       end)
-    if quality and recipeData.resultData.chanceByQuality[quality] > 0 then
-      return recipeData.priceData.craftingCosts *
-        (1 / recipeData.resultData.chanceByQuality[quality])
+    if quality and recipeData.resultData.chanceByQuality[quality] == 1 then
+      return recipeData.priceData.craftingCosts /
+        AddOn.determineAverageAmountProducedByRecipe(recipeData)
     else
       return nil
     end
@@ -1037,13 +1045,13 @@ function _.determineAverageAmountProduced(item)
   local recipe = _.retrieveRecipeForItem(item.id)
   if recipe then
     local recipeData = CraftSim.RecipeData(recipe.recipeID, false, false)
-    return CraftSim.CALC:GetExpectedItemAmountMulticraft(recipeData)
+    return AddOn.determineAverageAmountProducedByRecipe(recipeData)
   else
     return nil
   end
 end
 
---- @param recipeData RecipeData
+--- @param recipeData CraftSim.RecipeData
 function AddOn.determineAverageAmountProducedByRecipe(recipeData)
   return CraftSim.CALC:GetExpectedItemAmountMulticraft(recipeData)
 end
@@ -1100,76 +1108,72 @@ function AddOn.determineBestSourcesForThing(inventory, thing)
   --- @type BestSources
   local bestSources = {}
 
-  local itemLinks = thing.itemLinks:toList()
-  Array.map(itemLinks, function(itemLink)
-    AddOn.loadItem(AddOn.createItem(itemLink))
-  end)
-  table.sort(itemLinks, _.compareQuality)
+  local itemLink = thing.itemLink
+  AddOn.loadItem(AddOn.createItem(itemLink))
 
   local amountLeft = thing.amount
 
-  for __, itemLink in ipairs(itemLinks) do
-    local retrieval = _.retrieveFromInventory(inventory, itemLink, amountLeft)
+  local retrieval = _.retrieveFromInventory(inventory, itemLink, amountLeft)
 
-    for source, amount in pairs(retrieval) do
-      if not bestSources[source] then
-        bestSources[source] = {}
-      end
-      table.insert(bestSources[source], {
-        itemLink = itemLink,
-        amount = amount,
+  for source, amount in pairs(retrieval) do
+    if not bestSources[source] then
+      bestSources[source] = {}
+    end
+    table.insert(bestSources[source], {
+      itemLink = itemLink,
+      amount = amount,
+    })
+  end
+
+  local amountLeft = amountLeft -
+    Mathematics.sum(Object.values(retrieval))
+
+  -- other sources
+  if amountLeft >= 1 then
+    local item = {
+      itemLink = itemLink,
+      recipeID = _.retrieveRecipeIDForItem(itemLink),
+    }
+    local npcBuyPrice = _.determineNPCBuyPrice(itemLink)
+    -- TODO: Craft if crafting results in a higher quality for a lower price than buying the specified quality from AH.
+    local craftingPrice = _.determineCraftingCost(item)
+    local auctionHouseBuyPrice = AddOn.determineAuctionHouseBuyPrice(AddOn
+      .createItem(item.itemLink))
+    local sources = {}
+    if npcBuyPrice then
+      table.insert(sources, {
+        type = AddOn.SourceType.NPCVendor,
+        price = npcBuyPrice,
       })
     end
-
-    local amountLeft = amountLeft -
-      Mathematics.sum(Object.values(retrieval))
-
-    -- other sources
-    if amountLeft >= 1 then
-      local item = {
-        itemLink = itemLink,
-        recipeID = _.retrieveRecipeIDForItem(itemLink),
-      }
-      local npcBuyPrice = _.determineNPCBuyPrice(itemLink)
-      local craftingPrice = _.determineCraftingCost(item)
-      local auctionHouseBuyPrice = AddOn.determineAuctionHouseBuyPrice(AddOn
-        .createItem(item.itemLink))
-      local sources = {}
-      if npcBuyPrice then
-        table.insert(sources, {
-          type = AddOn.SourceType.NPCVendor,
-          price = npcBuyPrice,
-        })
-      end
-      if craftingPrice then
-        table.insert(sources, {
-          type = AddOn.SourceType.Crafting,
-          price = craftingPrice,
-        })
-      end
-      if auctionHouseBuyPrice then
-        table.insert(sources, {
-          type = AddOn.SourceType.AuctionHouse,
-          price = auctionHouseBuyPrice,
-        })
-      end
-      local lowestPriceSource = Array.min(sources, function(source)
-        return source.price
-      end)
-      local source
-      if lowestPriceSource then
-        source = lowestPriceSource.type
-      else
-        source = AddOn.SourceType.Otherwise
-      end
-      if not bestSources[source] then
-        bestSources[source] = {}
-      end
-      table.insert(bestSources[source], {
-        itemLink = itemLink,
-        amount = amountLeft,
+    if craftingPrice then
+      table.insert(sources, {
+        type = AddOn.SourceType.Crafting,
+        price = craftingPrice,
       })
     end
+    if auctionHouseBuyPrice then
+      table.insert(sources, {
+        type = AddOn.SourceType.AuctionHouse,
+        price = auctionHouseBuyPrice,
+      })
+    end
+    local lowestPriceSource = Array.min(sources, function(source)
+      return source.price
+    end)
+    local source
+    if lowestPriceSource then
+      source = lowestPriceSource.type
+    else
+      source = AddOn.SourceType.Otherwise
+    end
+    if not bestSources[source] then
+      bestSources[source] = {}
+    end
+    table.insert(bestSources[source], {
+      itemLink = itemLink,
+      amount = amountLeft,
+    })
   end
 
   return bestSources
@@ -1199,58 +1203,8 @@ function _.determineNPCBuyPrice(itemID)
   return nil -- TODO: Implement
 end
 
-function _.determineCraftingPrice(itemID)
-  local recipeID = _.retrieveRecipeIDForItem(itemID)
-
-  if recipeID then
-    local exportMode = CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER
-    local recipeData = CraftSim.DATAEXPORT:exportRecipeData(recipeID, exportMode)
-    if recipeData then
-      local recipeType = recipeData.recipeType
-      local priceData = CraftSim.PRICEDATA:GetPriceData(recipeData, recipeType)
-      local statWeights = CraftSim.AVERAGEPROFIT
-        :getProfessionStatWeightsForCurrentRecipe(recipeData, priceData,
-          exportMode)
-      local averageAmountProducedPerCraft = statWeights.craftedItems.baseQuality +
-        statWeights.craftedItems.nextQuality
-      local averageCraftingCostPerCraftedItem = priceData.craftingCostPerCraft /
-        averageAmountProducedPerCraft
-      return averageCraftingCostPerCraftedItem
-    end
-  end
-
-  return nil
-end
-
 --- @param item Item
 function AddOn.determineAuctionHouseBuyPrice(item)
   local itemString = AddOn.generateItemString(item)
   return TSM_API.GetCustomPriceValue("DBRecent", itemString)
-end
-
-function _.findRecipesToCraft()
-  local allRecipes = _.retrieveAllRecipes()
-  local potentialCandidates = Array.filter(allRecipes, function(recipe)
-    return _.isCraftable(recipe) and
-      _.canProducedItemBeSoldInTheAuctionHouse(recipe)
-  end)
-  local recipesToCraft = {}
-  Array.forEach(potentialCandidates, function(potentialCandidate)
-    local bestConfiguration = _.selectBestConfiguration(potentialCandidate)
-    if _.averageProfitPerCraft(bestConfiguration) > 0 then
-      table.insert(recipesToCraft, {
-        recipe = potentialCandidate,
-        amount = _.retrieveAverageDailySold(item),
-      })
-    end
-  end)
-  return recipesToCraft
-end
-
-function _.isCraftable(recipe)
-
-end
-
-function _.canProducedItemBeSoldInTheAuctionHouse(recipe)
-
 end
