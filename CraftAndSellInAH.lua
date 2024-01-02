@@ -70,7 +70,11 @@ AddOn.SourceType = {
 
 --- @alias BestSources { [SourceType]: BestSourcesEntry[] }
 
---- @alias Groups { [SourceType]: { [ItemLink]: ItemToRetrieve } }
+--- @class GroupEntry
+--- @field itemLink ItemLink
+--- @field amount number
+
+--- @alias Groups { [SourceType]: { [ItemLink]: GroupEntry } }
 
 --- @alias Inventory { [SourceType]: { [ItemLink]: number } }
 
