@@ -40,7 +40,7 @@ local CraftSim = CraftSim_DEBUG:RUN()
 --- @class CraftingTask
 --- @field recipeID RecipeID
 --- @field amount Amount
---- @field recipeData RecipeData
+--- @field recipeData CraftSim.RecipeData
 
 --- @class ThingToRetrieve
 --- @field itemLinks Set
@@ -328,12 +328,10 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
     end)
 
   Array.create(Object.values(groupedThingsToCraft)):forEach(function(
-    thingsToCraft)
+    craftingTasks)
     table.sort(craftingTasks, function(a, b)
-      local thingsRequiredForB = _.determineThingsRequiredPerCraftingTask(b
-        .recipeID)
       return Array.any(
-        thingsRequiredForB.reagentData.requiredReagents, function(reagent)
+        b.recipeData.reagentData.requiredReagents, function(reagent)
           return _.retrieveRecipeIDForItem(reagent.items[1].item:GetItemID()) ==
             a.recipeID
         end)
@@ -669,47 +667,10 @@ function _.determineThingsToRetrieve(craftingTasks)
 end
 
 --- @param craftingTask CraftingTask
---- @return ThingToRetrieve[]|nil
+--- @return ThingToRetrieve[]
 function _.determineThingsToRetrieveForCraftingTask(craftingTask)
-  local thingsRequiredForCraft = _.determineThingsRequiredForCraftingTask(
+  return _.determineThingsRequiredForCraftingTask(
     craftingTask)
-  local thingsToRetrieveForThing = {}
-
-  for index, thingRequiredForThing in ipairs(thingsRequiredForCraft) do
-    local itemLinks = thingRequiredForThing.itemLinks:toList()
-    --- @type Array
-    local itemsWithPrices = Array.map(itemLinks, function(itemLink)
-      local item = {
-        itemLink = itemLink,
-        price = _.determineAuctionHousePrice(AddOn.createItem(itemLink)),
-      }
-      return item
-    end):filter(function(item)
-      return item.price ~= nil
-    end)
-    if itemsWithPrices:hasElements() then
-      local itemWithLowestPrice = Array.min(itemsWithPrices,
-        function(itemWithPrice)
-          return itemWithPrice.price
-        end)
-      -- FIXME: Is this compatible with CraftSim RecipeData (only a specific configuration of reagents)?
-      local selectedItems = Array.filter(itemsWithPrices, function(itemWithPrice)
-        return itemWithPrice.price <= itemWithLowestPrice.price
-      end)
-      local amount = thingRequiredForThing.amount
-      local thingToRetrieveForThing = Object.assign({}, thingRequiredForThing, {
-        itemLinks = Set.create(Array.map(selectedItems, function(item)
-          return item.itemLink
-        end)),
-        amount = amount,
-      })
-      table.insert(thingsToRetrieveForThing, thingToRetrieveForThing)
-    else
-      return nil
-    end
-  end
-
-  return thingsToRetrieveForThing
 end
 
 function _.determineMinimumQualityRequiredForCraft(thingToCraft)
@@ -750,6 +711,7 @@ function ThingRequired.create(data)
 end
 
 --- @param craftingTask CraftingTask
+--- @return ThingToRetrieve[]
 function _.determineThingsRequiredForCraftingTask(craftingTask)
   local thingsRequiredForThing = {}
   local thingsRequiredPerThing = _.determineThingsRequiredPerCraftingTask(
@@ -766,11 +728,13 @@ function _.determineThingsRequiredForCraftingTask(craftingTask)
 end
 
 --- @param craftingTask CraftingTask
+--- @return ThingToRetrieve[]
 function _.determineThingsRequiredPerCraftingTask(craftingTask)
   local recipeID = craftingTask.recipeID
   local recipeSchematic = C_TradeSkillUI.GetRecipeSchematic(recipeID, false)
   local reagentSlotSchematics = recipeSchematic.reagentSlotSchematics
-  local thingsToBuy = {}
+  --- @type ThingToRetrieve[]
+  local thingsToRetrieve = {}
 
   Array.forEach(reagentSlotSchematics, function(reagentSlotSchematic)
     if reagentSlotSchematic.reagentType == Enum.CraftingReagentType.Basic then
@@ -778,19 +742,11 @@ function _.determineThingsRequiredPerCraftingTask(craftingTask)
         return reagent.itemID
       end)
 
-      local recipeID
-      if Array.hasElements(itemIDs) then
-        recipeID = _.retrieveRecipeIDForItem(itemIDs[1])
-      else
-        recipeID = nil
-      end
-
       if #itemIDs == 1 then
         local item = AddOn.createItem(itemIDs[1])
         AddOn.loadItem(item)
         local itemLink = item:GetItemLink()
-        table.insert(thingsToBuy, {
-          recipeID = recipeID,
+        table.insert(thingsToRetrieve, {
           itemLinks = Set.create({ itemLink, }),
           amount = reagentSlotSchematic.quantityRequired,
         })
@@ -809,8 +765,7 @@ function _.determineThingsRequiredPerCraftingTask(craftingTask)
           if quantity > 0 then
             AddOn.loadItem(item.item)
             local itemLink = item.item:GetItemLink()
-            table.insert(thingsToBuy, {
-              recipeID = recipeID,
+            table.insert(thingsToRetrieve, {
               itemLinks = Set.create({ itemLink, }),
               amount = quantity,
             })
@@ -826,14 +781,13 @@ function _.determineThingsRequiredPerCraftingTask(craftingTask)
     else
       recipeID = nil
     end
-    table.insert(thingsToBuy, {
-      recipeID = recipeID,
+    table.insert(thingsToRetrieve, {
       itemLinks = Array.map(craftingTask.missiveIDs, _.convertItemIDToItemLink),
       amount = 1,
     })
   end
 
-  return thingsToBuy
+  return thingsToRetrieve
 end
 
 -- /dump C_TradeSkillUI.GetRecipeInfo(ProfessionsFrame.CraftingPage.SchematicForm.currentRecipeInfo.recipeID)

@@ -429,6 +429,7 @@ craftPlannedButton:SetScript("OnClick", function()
         local amountRemainingToCraft = craftingTask.amount
         local canCraft, craftableAmount = craftingTask.recipeData:CanCraft(
           amountRemainingToCraft)
+        DevTools_Dump(craftingTask.recipeData.reagentData:Debug())
         if craftableAmount >= 1 then
           local listener
           listener = Events.listenForEvent("TRADE_SKILL_CLOSE", function()
@@ -465,6 +466,14 @@ craftPlannedButton:SetScript("OnClick", function()
                       hasSpellCastFailed = true
                     end
                   end)
+                local numberOfCrafts = 0
+                local listener3 = Events.listenForEvent(
+                  "UNIT_SPELLCAST_SUCCEEDED",
+                  function(event, unitTarget, castGUID, spellID)
+                    if unitTarget == "player" and spellID == craftingTask.recipeID then
+                      numberOfCrafts = numberOfCrafts + 1
+                    end
+                  end)
                 craftingTask.recipeData:Craft(amountToCraft)
                 if not hasSpellCastFailed then
                   print(1)
@@ -488,13 +497,16 @@ craftPlannedButton:SetScript("OnClick", function()
                     end))
                   print(2)
                   if event == "TRADE_SKILL_CLOSE" then
+                    listener2:stopListening()
+                    listener3:stopListening()
                     return
                   elseif event == "UPDATE_TRADESKILL_CAST_STOPPED" or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_STOP" then
                     amountRemainingToCraft = amountRemainingToCraft -
-                      amountToCraft
+                      numberOfCrafts
                   end
                 end
                 listener2:stopListening()
+                listener3:stopListening()
               else
                 return
               end
