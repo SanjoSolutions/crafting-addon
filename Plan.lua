@@ -112,12 +112,10 @@ buyButton:SetScript("OnClick", function()
     local buyTasks = Array.map(thingsToRetrieveFromAH, function(thingToRetrieve)
       local item = AddOn.createItem(thingToRetrieve.itemLink)
       AddOn.loadItem(item)
-      local maximumUnitPriceToBuyFor = AddOn.determineAuctionHouseBuyPrice(item) +
-        TOLERANCE_AMOUNT
       return {
         itemLink = thingToRetrieve.itemLink,
         amount = thingToRetrieve.amount,
-        maximumUnitPriceToBuyFor = maximumUnitPriceToBuyFor,
+        maximumUnitPriceToBuyFor = thingToRetrieve.maximumPurchasePrice,
       }
     end)
     AddOn.buy(buyTasks)

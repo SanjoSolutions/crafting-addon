@@ -63,10 +63,15 @@ end
 --- @class ThingRequired
 --- @field itemLink ItemLink
 --- @field amount number
+--- @field maximumPurchasePrice Money|nil
+
+--- @class ThingRequiredWithMaximumPurchasePrice: ThingRequired
+--- @field maximumPurchasePrice Money
 
 --- @class ItemToRetrieve
 --- @field itemLink ItemLink
 --- @field amount number
+--- @field maximumPurchasePrice Money|nil
 
 --- @enum SourceType
 AddOn.SourceType = {
@@ -85,12 +90,14 @@ AddOn.SourceType = {
 --- @class BestSourcesEntry
 --- @field itemLink ItemLink
 --- @field amount Amount
+--- @field maximumPurchasePrice Money|nil
 
 --- @alias BestSources { [SourceType]: BestSourcesEntry[] }
 
 --- @class GroupEntry
 --- @field itemLink ItemLink
 --- @field amount number
+--- @field maximumPurchasePrice Money|nil
 
 --- @alias Groups { [SourceType]: { [ItemLink]: GroupEntry } }
 
@@ -553,7 +560,7 @@ end
 
 --- @param item Item
 function _.determineBreakEvenPrice(item)
-  local recipe = _.retrieveRecipeForItem(item:GetItemID())
+  local recipe = AddOn.retrieveRecipeForItem(item:GetItemID())
   local recipeData = AddOn.determineRecipeData(recipe.recipeID)
   local averageAmountProduced = AddOn.determineAverageAmountProducedByRecipe(
     recipeData)
@@ -690,6 +697,11 @@ function _.determineReagentSourcesForCrafts(craftingTasks, groups, inventory)
         if groups[source][itemLink] then
           groups[source][itemLink].amount = groups[source][itemLink].amount +
             entry.amount
+          if source == AddOn.SourceType.AuctionHouse then
+            groups[source][itemLink].maximumPurchasePrice = math.max(
+              groups[source][itemLink].maximumPurchasePrice,
+              entry.maximumPurchasePrice)
+          end
         else
           groups[source][itemLink] = Object.copy(entry)
         end
@@ -699,7 +711,7 @@ function _.determineReagentSourcesForCrafts(craftingTasks, groups, inventory)
 end
 
 --- @param craftingTasks CraftingTask[]
---- @return ThingRequired[]
+--- @return ThingRequiredWithMaximumPurchasePrice[]
 function _.determineThingsRequiredForCraftingTasks(craftingTasks)
   return _.sum(Array.flat(Array.selectTrue(Array.map(
     craftingTasks,
@@ -728,7 +740,7 @@ function _.determineQualityOfItem(itemID)
 end
 
 --- @param craftingTask CraftingTask
---- @return ThingRequired[]
+--- @return ThingRequiredWithMaximumPurchasePrice[]
 function _.determineThingsRequiredForCraftingTask(craftingTask)
   local thingsRequiredForThing = {}
   local thingsRequiredPerThing = _.determineThingsRequiredPerCraftingTask(
@@ -738,10 +750,24 @@ function _.determineThingsRequiredForCraftingTask(craftingTask)
     table.insert(thingsRequiredForThing,
       Object.assign({}, thingRequiredPerThing, {
         amount = (craftingTask.amount or 1) * thingRequiredPerThing.amount,
+        maximumPurchasePrice = _.determineMaximumPurchasePrice(
+          AddOn.createItem(
+            thingRequiredPerThing.itemLink), craftingTask),
       }))
   end)
 
   return thingsRequiredForThing
+end
+
+--- @param item Item
+--- @param craftingTask CraftingTask
+--- @return Money
+function _.determineMaximumPurchasePrice(item, craftingTask)
+  local priceOfItem = AddOn.determineAuctionHouseBuyPrice(item)
+  local totalCraftingCost = craftingTask.recipeData.priceData.craftingCosts
+  local averageProfit = craftingTask.recipeData:GetAverageProfit()
+  return priceOfItem +
+    (priceOfItem / totalCraftingCost) * averageProfit
 end
 
 --- @param craftingTask CraftingTask
@@ -858,7 +884,7 @@ function _.retrieveCraftedItemIDs(recipeID)
   end
 end
 
-function _.retrieveRecipeForItem(itemID)
+function AddOn.retrieveRecipeForItem(itemID)
   local recipeID = _.retrieveRecipeIDForItem(itemID)
   if recipeID then
     return _.retrieveRecipeForRecipeID(recipeID)
@@ -875,8 +901,8 @@ function _.retrieveRecipeIDForItem(itemID)
   return CraftingSavedVariables.itemIDToRecipeID[itemID]
 end
 
---- @param thingsRequired ThingRequired[]
---- @return ThingRequired[]
+--- @param thingsRequired ThingRequiredWithMaximumPurchasePrice[]
+--- @return ThingRequiredWithMaximumPurchasePrice[]
 function _.sum(thingsRequired)
   local totalThingsToRetrieve = {}
   local lookup = {}
@@ -885,6 +911,8 @@ function _.sum(thingsRequired)
     local entry = lookup[itemLink]
     if entry then
       entry.amount = entry.amount + thingRequired.amount
+      entry.maximumPurchasePrice = math.max(entry.maximumPurchasePrice,
+        thingRequired.maximumPurchasePrice)
     else
       local entry = Object.copy(thingRequired)
       table.insert(totalThingsToRetrieve, entry)
@@ -1049,7 +1077,7 @@ function _.determineCraftingCost(item)
 end
 
 function _.determineAverageAmountProduced(item)
-  local recipe = _.retrieveRecipeForItem(item.id)
+  local recipe = AddOn.retrieveRecipeForItem(item.id)
   if recipe then
     local recipeData = AddOn.determineRecipeData(recipe.recipeID)
     return AddOn.determineAverageAmountProducedByRecipe(recipeData)
@@ -1126,10 +1154,11 @@ function AddOn.determineBestSourcesForThing(inventory, thing)
     if not bestSources[source] then
       bestSources[source] = {}
     end
-    table.insert(bestSources[source], {
+    local bestSourceEntry = {
       itemLink = itemLink,
       amount = amount,
-    })
+    }
+    table.insert(bestSources[source], bestSourceEntry)
   end
 
   local amountLeft = amountLeft -
@@ -1163,6 +1192,7 @@ function AddOn.determineBestSourcesForThing(inventory, thing)
       table.insert(sources, {
         type = AddOn.SourceType.AuctionHouse,
         price = auctionHouseBuyPrice,
+        maximumPurchasePrice = thing.maximumPurchasePrice,
       })
     end
     local lowestPriceSource = Array.min(sources, function(source)
@@ -1177,10 +1207,15 @@ function AddOn.determineBestSourcesForThing(inventory, thing)
     if not bestSources[source] then
       bestSources[source] = {}
     end
-    table.insert(bestSources[source], {
+    local bestSourceEntry = {
       itemLink = itemLink,
       amount = amountLeft,
-    })
+    }
+    if lowestPriceSource and source == AddOn.SourceType.AuctionHouse then
+      bestSourceEntry.maximumPurchasePrice = lowestPriceSource
+        .maximumPurchasePrice
+    end
+    table.insert(bestSources[source], bestSourceEntry)
   end
 
   return bestSources
