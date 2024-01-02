@@ -502,7 +502,7 @@ function _.doSellTask(sellTask)
 
     local breakEvenPrice = _.determineBreakEvenPrice(item)
 
-    if unitPrice <= breakEvenPrice then
+    if unitPrice >= breakEvenPrice then
       local containerIndex, slotIndex = Bags.findItem(itemID)
       if containerIndex and slotIndex then
         local item = ItemLocation:CreateFromBagAndSlot(containerIndex, slotIndex)

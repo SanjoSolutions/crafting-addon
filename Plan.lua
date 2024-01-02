@@ -463,7 +463,8 @@ craftPlannedButton:SetScript("OnClick", function()
               craftingTask:determineAmountRemainingToCraft())
             print("craftableAmount", craftableAmount)
             if craftableAmount >= 1 then
-              local amountToCraft = min(craftableAmount, craftingTask.amount)
+              local amountToCraft = min(craftableAmount,
+                craftingTask:determineAmountRemainingToCraft())
               print("Going to craft " ..
                 amountToCraft ..
                 " x " ..
