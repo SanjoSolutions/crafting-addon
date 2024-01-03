@@ -12,11 +12,11 @@ local _ = {}
 --- @type Array
 local Array = Library.retrieve("Array", "^2.1.1")
 --- @type Bags
-local Bags = Library.retrieve("Bags", "^2.0.5")
+local Bags = Library.retrieve("Bags", "^2.1.0")
 --- @type Coroutine
 local Coroutine = Library.retrieve("Coroutine", "^2.0.1")
 --- @type Events
-local Events = Library.retrieve("Events", "^2.1.0")
+local Events = Library.retrieve("Events", "^2.2.0")
 --- @type Mathematics
 local Mathematics = Library.retrieve("Mathematics", "^2.0.1")
 --- @type Object
@@ -558,7 +558,7 @@ function _.doSellTask(sellTask)
           end
         end, 3)
 
-    if event == "AUCTION_HOUSE_SHOW_ERROR" and argument1 == 10 then
+    if event == "AUCTION_HOUSE_SHOW_ERROR" and argument1 == Enum.AuctionHouseError.DatabaseError then
       Events.waitForEvent("AUCTION_HOUSE_THROTTLED_SYSTEM_READY")
     end
 
@@ -578,42 +578,76 @@ function _.doSellTask(sellTask)
   local minimumPriceToSellFor = 0.5 * AddOn.determineAuctionHouseBuyPrice(item)
 
   if unitPrice >= minimumPriceToSellFor then
-    local containerIndex, slotIndex = Bags.findItem(itemID)
-    if containerIndex and slotIndex then
-      local item = ItemLocation:CreateFromBagAndSlot(containerIndex, slotIndex)
-      local duration = 1
-      -- TODO: Does it work if the item is distributed over multiple slots?
-      local itemLink = C_Item.GetItemLink(item)
-      print("Trying to put in " ..
-        amount ..
-        " x " .. itemLink .. " (each for " .. GetMoneyString(unitPrice) .. ").")
-      if MoneyMakingAssistant.showConfirmButton() then
-        if event == "COMMODITY_SEARCH_RESULTS_UPDATED" then
-          local requiresConfirmation = C_AuctionHouse.PostCommodity(item,
-            duration,
-            amount, unitPrice)
-          if requiresConfirmation then
-            C_AuctionHouse.ConfirmPostCommodity(item, duration, amount, unitPrice)
+    local boundItems = {}
+    while true do
+      local containerIndex, slotIndex = Bags.findItem(function(containerIndex,
+        slotIndex)
+        local slotItemID = C_Container.GetContainerItemID(containerIndex,
+          slotIndex)
+        return slotItemID == itemID and
+          not C_Item.IsBound(ItemLocation:CreateFromBagAndSlot(containerIndex,
+            slotIndex)) and not Array.any(boundItems, function(boundItem)
+            return boundItem[1] == containerIndex and boundItem[2] == slotIndex
+          end)
+      end)
+      if containerIndex and slotIndex then
+        local item = ItemLocation:CreateFromBagAndSlot(containerIndex, slotIndex)
+        local duration = 1
+        -- TODO: Does it work if the item is distributed over multiple slots?
+        local itemLink = C_Item.GetItemLink(item)
+        print("Trying to put in " ..
+          amount ..
+          " x " .. itemLink .. " (each for " .. GetMoneyString(unitPrice) .. ").")
+        if MoneyMakingAssistant.showConfirmButton() then
+          local errorCode = nil
+          local listener
+          listener = Events.listenForEvent("AUCTION_HOUSE_SHOW_ERROR",
+            function(event, code)
+              errorCode = code
+              listener:stopListening()
+            end)
+          if event == "COMMODITY_SEARCH_RESULTS_UPDATED" then
+            local requiresConfirmation = C_AuctionHouse.PostCommodity(item,
+              duration,
+              amount, unitPrice)
+            if requiresConfirmation then
+              C_AuctionHouse.ConfirmPostCommodity(item, duration, amount,
+                unitPrice)
+            end
+          elseif event == "ITEM_SEARCH_RESULTS_UPDATED" then
+            local requiresConfirmation = C_AuctionHouse.PostItem(item,
+              duration,
+              amount, nil, unitPrice)
+            if requiresConfirmation then
+              C_AuctionHouse.ConfirmPostItem(item, duration, amount, nil,
+                unitPrice)
+            end
           end
-        elseif event == "ITEM_SEARCH_RESULTS_UPDATED" then
-          local requiresConfirmation = C_AuctionHouse.PostItem(item,
-            duration,
-            amount, nil, unitPrice)
-          if requiresConfirmation then
-            C_AuctionHouse.ConfirmPostItem(item, duration, amount, nil, unitPrice)
+          listener:stopListening()
+          if errorCode == nil then
+            local wasSuccessful = Events.waitForEvent(
+              "AUCTION_HOUSE_AUCTION_CREATED", 3)
+            if wasSuccessful then
+              print("Have put in " ..
+                amount ..
+                " x " ..
+                itemLink .. " (each for " .. GetMoneyString(unitPrice) .. ").")
+              break
+            else
+              print("Error putting in " .. amount .. " x " .. itemLink .. ".")
+              break
+            end
+          else
+            if errorCode == Enum.AuctionHouseError.UsedCharges then
+              table.insert(boundItems, { containerIndex, slotIndex, })
+            else
+              print("Error putting in " .. amount .. " x " .. itemLink .. ".")
+              break
+            end
           end
         end
-        -- TODO: Events for error?
-        local wasSuccessful = Events.waitForEvent(
-          "AUCTION_HOUSE_AUCTION_CREATED", 3)
-        if wasSuccessful then
-          print("Have put in " ..
-            amount ..
-            " x " ..
-            itemLink .. " (each for " .. GetMoneyString(unitPrice) .. ").")
-        else
-          print("Error putting in " .. amount .. " x " .. itemLink .. ".")
-        end
+      else
+        break
       end
     end
   else

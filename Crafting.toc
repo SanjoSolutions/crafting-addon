@@ -9,6 +9,7 @@
 node_modules\@sanjo-addons\library\Library.xml
 
 node_modules\@sanjo-addons\array\Array.xml
+node_modules\@sanjo-addons\bags\Bags.xml
 node_modules\@sanjo-addons\boolean\Boolean.xml
 node_modules\@sanjo-addons\coroutine\Coroutine.xml
 node_modules\@sanjo-addons\events\Events.xml

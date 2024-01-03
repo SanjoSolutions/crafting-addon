@@ -10,7 +10,7 @@ local Boolean = Library.retrieve("Boolean", "^2.0.0")
 --- @type Coroutine
 local Coroutine = Library.retrieve("Coroutine", "^2.0.1")
 --- @type Events
-local Events = Library.retrieve("Events", "^2.1.0")
+local Events = Library.retrieve("Events", "^2.2.0")
 --- @type Mathematics
 local Mathematics = Library.retrieve("Mathematics", "^2.0.1")
 --- @type Object
@@ -465,7 +465,7 @@ craftPlannedButton:SetScript("OnClick", function()
           end)
           Professions.SetDefaultFilters()
           SearchBoxTemplate_ClearText(ProfessionsFrame.CraftingPage.RecipeList
-          .SearchBox)
+            .SearchBox)
           C_TradeSkillUI.OpenRecipe(craftingTask.recipeData.recipeID)
           craftingTask.recipeData.professionGearSet:Equip()
           Coroutine.waitFor(function()
