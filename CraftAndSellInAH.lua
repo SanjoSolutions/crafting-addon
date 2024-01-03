@@ -531,6 +531,9 @@ function _.doSellTask(sellTask)
   local amount = sellTask.amount
 
   local itemKey = { itemID = itemID, }
+  if item:GetCurrentItemLevel() then
+    itemKey.itemLevel = item:GetCurrentItemLevel()
+  end
   local wasSuccessful, event, argument1
   while true do
     C_AuctionHouse.SendSearchQuery(
@@ -559,7 +562,7 @@ function _.doSellTask(sellTask)
       Events.waitForEvent("AUCTION_HOUSE_THROTTLED_SYSTEM_READY")
     end
 
-    if event ~= "AUCTION_HOUSE_SHOW_ERROR" then
+    if wasSuccessful and event ~= "AUCTION_HOUSE_SHOW_ERROR" then
       break
     end
   end
@@ -620,7 +623,7 @@ function _.doSellTask(sellTask)
       item:GetItemLink() ..
       " because the auction house price is below the break even price (" ..
       GetMoneyString(unitPrice) ..
-      " < " .. GetMoneyString(breakEvenPrice) .. ").")
+      " < " .. GetMoneyString(minimumPriceToSellFor) .. ").")
   end
 end
 
@@ -637,18 +640,31 @@ function _.determineUnitPriceForCommodity(itemID)
   return nil
 end
 
+--- @param itemKey ItemKey
+--- @return Money|nil
 function _.determineUnitPriceForItem(itemKey)
-  local numberOfSearchResults = C_AuctionHouse
-    .GetNumItemSearchResults(itemKey)
-  if numberOfSearchResults >= 1 then
-    local result = C_AuctionHouse.GetItemSearchResultInfo(itemKey, 1)
-    print("result")
-    DevTools_Dump(result)
-    if result then
-      return result.buyoutAmount
+  local result = _.retrieveLowestBuyoutAmountResult(itemKey)
+  if result then
+    local unitPrice = result.buyoutAmount
+    if result.owners[1] == UnitName("player") then
+      unitPrice = math.max(unitPrice - 100, 100)
+    end
+    return unitPrice
+  else
+    return nil
+  end
+end
+
+--- @param itemKey ItemKey
+--- @return ItemSearchResultInfo|nil
+function _.retrieveLowestBuyoutAmountResult(itemKey)
+  local numberOfSearchResults = C_AuctionHouse.GetNumItemSearchResults(itemKey)
+  for index = 1, numberOfSearchResults do
+    local result = C_AuctionHouse.GetItemSearchResultInfo(itemKey, index)
+    if result and result.buyoutAmount then
+      return result
     end
   end
-
   return nil
 end
 
