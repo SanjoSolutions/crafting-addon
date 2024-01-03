@@ -81,7 +81,7 @@ AddOn.SourceType = {
   GuildBank = 4,
   OtherCharacter = 5,
   Mail = 6,
-  Otherwise = 7,
+  Elsewhere = 7,
   Bag = 8,
   Bank = 9,
   ReagentBank = 10,
@@ -137,7 +137,7 @@ local sourceTypeToName = {
   [AddOn.SourceType.GuildBank] = "guild bank",
   [AddOn.SourceType.OtherCharacter] = "other character",
   [AddOn.SourceType.Mail] = "mail",
-  [AddOn.SourceType.Otherwise] = "otherwise",
+  [AddOn.SourceType.Elsewhere] = "elsewhere",
   [AddOn.SourceType.Bag] = "bag",
   [AddOn.SourceType.Bank] = "bank",
   [AddOn.SourceType.ReagentBank] = "reagent bank",
@@ -351,7 +351,7 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
     AddOn.SourceType.NPCVendor,
     AddOn.SourceType.AuctionHouse,
     AddOn.SourceType.OtherCharacter,
-    AddOn.SourceType.Otherwise,
+    AddOn.SourceType.Elsewhere,
     AddOn.SourceType.Crafting,
   }
   Array.forEach(order, function(source)
@@ -385,8 +385,49 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
   return list, groupedThingsToCraft
 end
 
+local bestStatsForClasses = {
+  ["Plate"] = { "Haste", "Mastery", }, -- For most specs of the plate classes it seems to be that.
+}
+local bestStatsForCraftingProfessions = { "Multicraft", "Inspiration",
+  "Resourcefulness", "Crafting Speed", }
+local bestStatsForGatheringProfessions = { "Perception", "Finesse", "Deftness", }
+
+--- @type Set
+local draconicMissivesForCraftingProfessions = Set.create({
+  200568, 200570, 200569,
+  198534, 198536, 198535,
+  200565, 200566, 200567,
+  200571, 200573, 200572,
+})
+
+--- @type Set
+local draconicMissivesForGatheringProfessions = Set.create({
+  200574, 200576, 200575,
+  200579, 200577, 200578,
+  200580, 200581, 200582,
+})
+
+--- @type Set
+local engineeringStatSetterItems = Set.create({
+  198174, 198176, 198175, 198232, 198233, 198231, 198236, 198238, 198237, 198307, 198309, 198308,
+})
+
 function AddOn.determineRecipeData(recipeID)
+  --- @type CraftSim.RecipeData
   local recipeData = CraftSim.RecipeData(recipeID, false, false)
+
+  -- for index, slot in ipairs(recipeData.reagentData.optionalReagentSlots) do
+  --   local itemID = slot.possibleReagents[1].item:GetItemID()
+  --   if draconicMissivesForCraftingProfessions:contains(itemID) then
+  --     local bestStat = bestStatsForCraftingProfessions[1]
+  --   elseif draconicMissivesForGatheringProfessions:contains(itemID) then
+  --     local bestStat = bestStatsForGatheringProfessions[1]
+  --   elseif engineeringStatSetterItems:contains(itemID) then
+  --     local bestStat = "Haste"
+  --   end
+  -- end
+  -- recipeData:SetOptionalReagent()
+
   -- FIXME: With CraftSim freshly installed, this seems to throw an error. It seems required to open the profession window once to fix the error.
   recipeData:SetEquippedProfessionGearSet()
   if not recipeData.hasQualityReagents then
@@ -761,13 +802,17 @@ end
 
 --- @param item Item
 --- @param craftingTask CraftingTask
---- @return Money
+--- @return Money|nil
 function _.determineMaximumPurchasePrice(item, craftingTask)
   local priceOfItem = AddOn.determineAuctionHouseBuyPrice(item)
-  local totalCraftingCost = craftingTask.recipeData.priceData.craftingCosts
-  local averageProfit = craftingTask.recipeData:GetAverageProfit()
-  return priceOfItem +
-    (priceOfItem / totalCraftingCost) * averageProfit
+  if priceOfItem then
+    local totalCraftingCost = craftingTask.recipeData.priceData.craftingCosts
+    local averageProfit = craftingTask.recipeData:GetAverageProfit()
+    return priceOfItem +
+      (priceOfItem / totalCraftingCost) * averageProfit
+  else
+    return nil
+  end
 end
 
 --- @param craftingTask CraftingTask
@@ -961,9 +1006,12 @@ function _.determineAmountInInventory(itemString)
 end
 
 --- @param item Item
-function AddOn.generateItemString(item)
+function AddOn.generateItemString(item, withItemLevel)
+  if withItemLevel == nil then
+    withItemLevel = true
+  end
   local itemString = "i:" .. item:GetItemID()
-  if not AddOn.isCommodityItem(item) then
+  if withItemLevel and not AddOn.isCommodityItem(item) then
     local itemLevel = item:GetCurrentItemLevel()
     if itemLevel then
       itemString = itemString .. "::i" .. itemLevel
@@ -1202,7 +1250,7 @@ function AddOn.determineBestSourcesForThing(inventory, thing)
     if lowestPriceSource then
       source = lowestPriceSource.type
     else
-      source = AddOn.SourceType.Otherwise
+      source = AddOn.SourceType.Elsewhere
     end
     if not bestSources[source] then
       bestSources[source] = {}

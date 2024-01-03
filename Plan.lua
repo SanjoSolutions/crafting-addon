@@ -164,7 +164,6 @@ function _.findRecipesToCraft()
             return requirement.name == "Earth-Warder's Forge"
           end) and recipeData:GetAverageProfit() > 0 then
           local window = 1 -- hour
-          local amountToCraft
           if recipeData.supportsQualities then
             Array.create(Object.entries(recipeData
               .resultData.chanceByQuality)):forEach(function(entry)
@@ -176,7 +175,7 @@ function _.findRecipesToCraft()
                 AddOn.loadItem(item)
                 local amountSoldPerDay = TSM_API.GetCustomPriceValue(
                   "dbregionsoldperday",
-                  AddOn.generateItemString(item)
+                  AddOn.generateItemString(item, false)
                 ) or 0
                 local amountInAuctionHouse = TSM_API.GetAuctionQuantity(AddOn
                   .generateItemString(item)) or 0
@@ -202,6 +201,7 @@ function _.findRecipesToCraft()
               end
             end)
           elseif recipeData.resultData.itemsByQuality[1] then -- skips recrafting
+            --- @type Item
             local item = recipeData.resultData.itemsByQuality[1]
             AddOn.loadItem(item)
             local amountSoldPerDay = TSM_API.GetCustomPriceValue(
@@ -210,9 +210,16 @@ function _.findRecipesToCraft()
             ) or 0
             local amountInAuctionHouse = TSM_API.GetAuctionQuantity(AddOn
               .generateItemString(item)) or 0
-            amountToCraft = max(
-              Mathematics.round(amountSoldPerDay / 24 * window) -
-              amountInAuctionHouse, 0)
+            local amountToPutIntoAuctionHouse = amountSoldPerDay *
+              window / 24
+            if amountToPutIntoAuctionHouse > 0 and amountToPutIntoAuctionHouse < 1 then
+              amountToPutIntoAuctionHouse = 1
+            else
+              amountToPutIntoAuctionHouse = Mathematics.round(
+                amountToPutIntoAuctionHouse)
+            end
+            local amountToCraft = max(
+              amountToPutIntoAuctionHouse - amountInAuctionHouse, 0)
             if amountToCraft > 0 then
               local item = {
                 itemLink = item:GetItemLink(),
