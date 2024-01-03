@@ -171,6 +171,7 @@ function _.findRecipesToCraft()
               local chance = entry.value
               if chance > 0 then
                 local quality = entry.key
+                --- @type Item
                 local item = recipeData.resultData.itemsByQuality[quality]
                 AddOn.loadItem(item)
                 local amountSoldPerDay = TSM_API.GetCustomPriceValue(
@@ -179,9 +180,16 @@ function _.findRecipesToCraft()
                 ) or 0
                 local amountInAuctionHouse = TSM_API.GetAuctionQuantity(AddOn
                   .generateItemString(item)) or 0
+                local amountToPutIntoAuctionHouse = amountSoldPerDay *
+                  window / 24
+                if amountToPutIntoAuctionHouse > 0 and amountToPutIntoAuctionHouse < 1 then
+                  amountToPutIntoAuctionHouse = 1
+                else
+                  amountToPutIntoAuctionHouse = Mathematics.round(
+                    amountToPutIntoAuctionHouse)
+                end
                 local amountToCraft = max(
-                  Mathematics.round(amountSoldPerDay / 24 *
-                    window) - amountInAuctionHouse, 0)
+                  amountToPutIntoAuctionHouse - amountInAuctionHouse, 0)
                 if amountToCraft > 0 then
                   --- @type ThingToCraft
                   local item = {
