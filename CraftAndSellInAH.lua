@@ -472,11 +472,20 @@ function _.purchase(purchaseTask)
     " (for a maximum unit price of " ..
     GetMoneyString(maximumUnitPriceToBuyFor) .. ").")
   if CraftAndSellInAH.showConfirmButton() then
-    C_AuctionHouse.StartCommoditiesPurchase(itemID, quantity)
-    local wasSuccessful, event, unitPrice, totalPrice = Events
-      .waitForOneOfEvents(
-        { "COMMODITY_PRICE_UPDATED", "COMMODITY_PRICE_UNAVAILABLE", },
-        3)
+    local wasSuccessful, event, unitPrice, totalPrice
+    while true do
+      C_AuctionHouse.StartCommoditiesPurchase(itemID, quantity)
+      wasSuccessful, event, unitPrice, totalPrice = Events
+        .waitForOneOfEvents(
+          { "COMMODITY_PRICE_UPDATED", "COMMODITY_PRICE_UNAVAILABLE",
+            "AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED", },
+          3)
+      if event == "AUCTION_HOUSE_THROTTLED_MESSAGE_DROPPED" then
+        print("Request seems to have been dropped. Trying again.")
+      else
+        break
+      end
+    end
     if event == "COMMODITY_PRICE_UPDATED" then
       if unitPrice <= maximumUnitPriceToBuyFor then
         C_AuctionHouse.ConfirmCommoditiesPurchase(itemID, quantity)
@@ -532,11 +541,15 @@ function _.doSellTask(sellTask)
 
     wasSuccessful, event, argument1 = Events
       .waitForOneOfEventsAndCondition(
-        { "COMMODITY_SEARCH_RESULTS_UPDATED", "AUCTION_HOUSE_SHOW_ERROR", },
+        { "COMMODITY_SEARCH_RESULTS_UPDATED", "ITEM_SEARCH_RESULTS_UPDATED",
+          "AUCTION_HOUSE_SHOW_ERROR", },
         function(self, event, argument1)
           if event == "COMMODITY_SEARCH_RESULTS_UPDATED" then
             local itemID = argument1
             return itemID == itemKey.itemID
+          elseif event == "ITEM_SEARCH_RESULTS_UPDATED" then
+            local itemKey2 = argument1
+            return itemKey2.itemID == itemKey.itemID
           elseif event == "AUCTION_HOUSE_SHOW_ERROR" then
             return true
           end
@@ -551,73 +564,88 @@ function _.doSellTask(sellTask)
     end
   end
 
+  local unitPrice
   if event == "COMMODITY_SEARCH_RESULTS_UPDATED" then
-    local unitPrice = _.determineUnitPrice(itemID)
-    -- TODO: Handle when unitPrice is nil. (When there is no item of the type in the AH?)
+    unitPrice = _.determineUnitPriceForCommodity(itemID)
+  elseif event == "ITEM_SEARCH_RESULTS_UPDATED" then
+    unitPrice = _.determineUnitPriceForItem(itemKey)
+  end
+  -- TODO: Handle when unitPrice is nil. (When there is no item of the type in the AH?)
 
-    local breakEvenPrice = _.determineBreakEvenPrice(item)
+  local minimumPriceToSellFor = 0.5 * AddOn.determineAuctionHouseBuyPrice(item)
 
-    if unitPrice >= breakEvenPrice then
-      local containerIndex, slotIndex = Bags.findItem(itemID)
-      if containerIndex and slotIndex then
-        local item = ItemLocation:CreateFromBagAndSlot(containerIndex, slotIndex)
-        local duration = 1
-        -- TODO: Does it work if the item is distributed over multiple slots?
-        local itemLink = C_Item.GetItemLink(item)
-        print("Trying to put in " ..
-          amount ..
-          " x " .. itemLink .. " (each for " .. GetMoneyString(unitPrice) .. ").")
-        if MoneyMakingAssistant.showConfirmButton() then
+  if unitPrice >= minimumPriceToSellFor then
+    local containerIndex, slotIndex = Bags.findItem(itemID)
+    if containerIndex and slotIndex then
+      local item = ItemLocation:CreateFromBagAndSlot(containerIndex, slotIndex)
+      local duration = 1
+      -- TODO: Does it work if the item is distributed over multiple slots?
+      local itemLink = C_Item.GetItemLink(item)
+      print("Trying to put in " ..
+        amount ..
+        " x " .. itemLink .. " (each for " .. GetMoneyString(unitPrice) .. ").")
+      if MoneyMakingAssistant.showConfirmButton() then
+        if event == "COMMODITY_SEARCH_RESULTS_UPDATED" then
           local requiresConfirmation = C_AuctionHouse.PostCommodity(item,
             duration,
             amount, unitPrice)
           if requiresConfirmation then
             C_AuctionHouse.ConfirmPostCommodity(item, duration, amount, unitPrice)
           end
-          -- TODO: Events for error?
-          local wasSuccessful = Events.waitForEvent(
-            "AUCTION_HOUSE_AUCTION_CREATED", 3)
-          if wasSuccessful then
-            print("Have put in " ..
-              amount ..
-              " x " ..
-              itemLink .. " (each for " .. GetMoneyString(unitPrice) .. ").")
-          else
-            print("Error putting in " .. amount .. " x " .. itemLink .. ".")
+        elseif event == "ITEM_SEARCH_RESULTS_UPDATED" then
+          local requiresConfirmation = C_AuctionHouse.PostItem(item,
+            duration,
+            amount, nil, unitPrice)
+          if requiresConfirmation then
+            C_AuctionHouse.ConfirmPostItem(item, duration, amount, nil, unitPrice)
           end
         end
+        -- TODO: Events for error?
+        local wasSuccessful = Events.waitForEvent(
+          "AUCTION_HOUSE_AUCTION_CREATED", 3)
+        if wasSuccessful then
+          print("Have put in " ..
+            amount ..
+            " x " ..
+            itemLink .. " (each for " .. GetMoneyString(unitPrice) .. ").")
+        else
+          print("Error putting in " .. amount .. " x " .. itemLink .. ".")
+        end
       end
-    else
-      print("Skipping to put in " ..
-        amount ..
-        " x " ..
-        item:GetItemLink() ..
-        " because the auction house price is below the break even price (" ..
-        GetMoneyString(unitPrice) ..
-        " < " .. GetMoneyString(breakEvenPrice) .. ").")
     end
+  else
+    print("Skipping to put in " ..
+      amount ..
+      " x " ..
+      item:GetItemLink() ..
+      " because the auction house price is below the break even price (" ..
+      GetMoneyString(unitPrice) ..
+      " < " .. GetMoneyString(breakEvenPrice) .. ").")
   end
 end
 
---- @param item Item
-function _.determineBreakEvenPrice(item)
-  local recipe = AddOn.retrieveRecipeForItem(item:GetItemID())
-  local recipeData = AddOn.determineRecipeData(recipe.recipeID)
-  local averageAmountProduced = AddOn.determineAverageAmountProducedByRecipe(
-    recipeData)
-  local averageProfit = recipeData:GetAverageProfit()
-  local auctionHousePrice = _.determineAuctionHousePrice(item)
-  local profitPerItem = averageProfit / averageAmountProduced
-  return auctionHousePrice - profitPerItem
-end
-
-function _.determineUnitPrice(itemID)
+function _.determineUnitPriceForCommodity(itemID)
   local numberOfCommoditySearchResults = C_AuctionHouse
     .GetNumCommoditySearchResults(itemID)
   if numberOfCommoditySearchResults >= 1 then
     local result = C_AuctionHouse.GetCommoditySearchResultInfo(itemID, 1)
     if result then
       return result.unitPrice
+    end
+  end
+
+  return nil
+end
+
+function _.determineUnitPriceForItem(itemKey)
+  local numberOfSearchResults = C_AuctionHouse
+    .GetNumItemSearchResults(itemKey)
+  if numberOfSearchResults >= 1 then
+    local result = C_AuctionHouse.GetItemSearchResultInfo(itemKey, 1)
+    print("result")
+    DevTools_Dump(result)
+    if result then
+      return result.buyoutAmount
     end
   end
 

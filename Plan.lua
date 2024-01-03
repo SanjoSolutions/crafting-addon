@@ -173,10 +173,10 @@ function _.findRecipesToCraft()
                 --- @type Item
                 local item = recipeData.resultData.itemsByQuality[quality]
                 AddOn.loadItem(item)
-                local amountSoldPerDay = TSM_API.GetCustomPriceValue(
-                  "dbregionsoldperday",
+                local amountSoldPerDay = (TSM_API.GetCustomPriceValue(
+                  "dbregionsoldperday*10000",
                   AddOn.generateItemString(item, false)
-                ) or 0
+                ) or 0) / 10000
                 local amountInAuctionHouse = TSM_API.GetAuctionQuantity(AddOn
                   .generateItemString(item)) or 0
                 local amountToPutIntoAuctionHouse = amountSoldPerDay *
@@ -204,10 +204,10 @@ function _.findRecipesToCraft()
             --- @type Item
             local item = recipeData.resultData.itemsByQuality[1]
             AddOn.loadItem(item)
-            local amountSoldPerDay = TSM_API.GetCustomPriceValue(
-              "dbregionsoldperday",
+            local amountSoldPerDay = (TSM_API.GetCustomPriceValue(
+              "dbregionsoldperday*10000",
               AddOn.generateItemString(item)
-            ) or 0
+            ) or 0) / 10000
             local amountInAuctionHouse = TSM_API.GetAuctionQuantity(AddOn
               .generateItemString(item)) or 0
             local amountToPutIntoAuctionHouse = amountSoldPerDay *
@@ -463,6 +463,9 @@ craftPlannedButton:SetScript("OnClick", function()
             CraftAndSellInAH.cancel()
             listener:stopListening()
           end)
+          Professions.SetDefaultFilters()
+          SearchBoxTemplate_ClearText(ProfessionsFrame.CraftingPage.RecipeList
+          .SearchBox)
           C_TradeSkillUI.OpenRecipe(craftingTask.recipeData.recipeID)
           craftingTask.recipeData.professionGearSet:Equip()
           Coroutine.waitFor(function()
