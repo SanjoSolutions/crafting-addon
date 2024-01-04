@@ -374,11 +374,13 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
   Array.create(Object.values(groupedThingsToCraft)):forEach(function(
     craftingTasks)
     table.sort(craftingTasks, function(a, b)
-      return Array.any(
+      local doesBDependOnA = Array.any(
         b.recipeData.reagentData.requiredReagents, function(reagent)
           return _.retrieveRecipeIDForItem(reagent.items[1].item) ==
             a.recipeID
         end)
+      return doesBDependOnA or
+        a.recipeData:GetAverageProfit() > b.recipeData:GetAverageProfit()
     end)
   end)
 
