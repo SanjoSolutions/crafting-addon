@@ -285,45 +285,45 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
   while groups[AddOn.SourceType.Crafting] and Array.hasElements(groups[AddOn.SourceType.Crafting]) do
     --- @type { [RecipeID]: CraftingTask }
     local furtherCrafts = Object.fromEntries(
-      Object.entries(
-        Array.groupBy(
-          Array.map(
-            groups[AddOn.SourceType.Crafting],
-            function(thingToCraft)
-              local recipeID = CraftingSavedVariables.itemIDToRecipeID
-                [thingToCraft.itemID]
-              return {
-                recipeID = recipeID,
-                amount = thingToCraft.amount,
-              }
-            end
-          ),
-          function(thingToCraft)
-            return thingToCraft.recipeID
-          end
-        )
-      )
-      :map(function(entry)
-        local recipeID = entry.key
-        local thingsToCraft = entry.value
-        local recipeData = AddOn.determineRecipeData(recipeID)
-        return {
-          key = recipeID,
-          value = {
-            recipeID = recipeID,
-            amount = math.ceil(
-              Array.max(
-                Array.map(
-                  thingsToCraft,
-                  function(thingToCraft)
-                    return thingToCraft.amount
-                  end
-                )
-              ) / AddOn.determineAverageAmountProducedByRecipe(recipeData)
+      Array.map(Object.entries(
+          Array.groupBy(
+            Array.map(
+              groups[AddOn.SourceType.Crafting],
+              function(thingToCraft)
+                local recipeID = CraftingSavedVariables.itemIDToRecipeID
+                  [thingToCraft.itemID]
+                return {
+                  recipeID = recipeID,
+                  amount = thingToCraft.amount,
+                }
+              end
             ),
-          },
-        }
-      end)
+            function(thingToCraft)
+              return thingToCraft.recipeID
+            end
+          )
+        ),
+        function(entry)
+          local recipeID = entry.key
+          local thingsToCraft = entry.value
+          local recipeData = AddOn.determineRecipeData(recipeID)
+          return {
+            key = recipeID,
+            value = {
+              recipeID = recipeID,
+              amount = math.ceil(
+                Array.max(
+                  Array.map(
+                    thingsToCraft,
+                    function(thingToCraft)
+                      return thingToCraft.amount
+                    end
+                  )
+                ) / AddOn.determineAverageAmountProducedByRecipe(recipeData)
+              ),
+            },
+          }
+        end)
     )
 
     for recipeID, craft in pairs(furtherCrafts) do
@@ -376,7 +376,7 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
     table.sort(craftingTasks, function(a, b)
       return Array.any(
         b.recipeData.reagentData.requiredReagents, function(reagent)
-          return _.retrieveRecipeIDForItem(reagent.items[1].item:GetItemID()) ==
+          return _.retrieveRecipeIDForItem(reagent.items[1].item) ==
             a.recipeID
         end)
     end)
@@ -1007,8 +1007,9 @@ function _.retrieveCraftedItemIDs(recipeID)
   end
 end
 
-function AddOn.retrieveRecipeForItem(itemID)
-  local recipeID = _.retrieveRecipeIDForItem(itemID)
+--- @param item Item
+function AddOn.retrieveRecipeForItem(item)
+  local recipeID = _.retrieveRecipeIDForItem(item)
   if recipeID then
     return _.retrieveRecipeForRecipeID(recipeID)
   else
@@ -1020,8 +1021,9 @@ function _.retrieveRecipeForRecipeID(recipeID)
   return CraftingSavedVariablesPerCharacter.recipes[recipeID]
 end
 
-function _.retrieveRecipeIDForItem(itemID)
-  return CraftingSavedVariables.itemIDToRecipeID[itemID]
+--- @param item Item
+function _.retrieveRecipeIDForItem(item)
+  return CraftingSavedVariables.itemIDToRecipeID[item:GetItemID()]
 end
 
 --- @param thingsRequired ThingRequiredWithMaximumPurchasePrice[]
@@ -1184,9 +1186,11 @@ function AddOn.showText(chatFrame, text)
 end
 
 -- TODO: Sagacious Incense buff (+20 inspiration) when it makes a difference
+--- @param item Item
 function _.determineCraftingCost(item)
-  if item.recipeID then
-    local recipeData = AddOn.determineRecipeData(item.recipeID)
+  local recipeID = _.retrieveRecipeIDForItem(item)
+  if recipeID then
+    local recipeData = AddOn.determineRecipeData(recipeID)
     local quality = Array.findIndex(recipeData.resultData.itemsByQuality,
       function(item2)
         return item2:GetItemLink() == item:GetItemLink()
@@ -1202,8 +1206,10 @@ function _.determineCraftingCost(item)
   end
 end
 
+--- @param item Item
+--- @return Amount|nil
 function _.determineAverageAmountProduced(item)
-  local recipe = AddOn.retrieveRecipeForItem(item.id)
+  local recipe = AddOn.retrieveRecipeForItem(item)
   if recipe then
     local recipeData = AddOn.determineRecipeData(recipe.recipeID)
     return AddOn.determineAverageAmountProducedByRecipe(recipeData)
@@ -1213,8 +1219,9 @@ function _.determineAverageAmountProduced(item)
 end
 
 --- @param recipeData CraftSim.RecipeData
+--- @return Amount
 function AddOn.determineAverageAmountProducedByRecipe(recipeData)
-  return CraftSim.CALC:GetExpectedItemAmountMulticraft(recipeData)
+  return select(1, CraftSim.CALC:GetExpectedItemAmountMulticraft(recipeData))
 end
 
 --- @param inventory Inventory
@@ -1270,7 +1277,8 @@ function AddOn.determineBestSourcesForThing(inventory, thing)
   local bestSources = {}
 
   local itemLink = thing.itemLink
-  AddOn.loadItem(AddOn.createItem(itemLink))
+  local item = AddOn.createItem(itemLink)
+  AddOn.loadItem(item)
 
   local amountLeft = thing.amount
 
@@ -1292,15 +1300,10 @@ function AddOn.determineBestSourcesForThing(inventory, thing)
 
   -- other sources
   if amountLeft >= 1 then
-    local item = {
-      itemLink = itemLink,
-      recipeID = _.retrieveRecipeIDForItem(itemLink),
-    }
-    local npcBuyPrice = _.determineNPCBuyPrice(itemLink)
+    local npcBuyPrice = _.determineNPCBuyPrice(item)
     -- TODO: Craft if crafting results in a higher quality for a lower price than buying the specified quality from AH.
     local craftingPrice = _.determineCraftingCost(item)
-    local auctionHouseBuyPrice = AddOn.determineAuctionHouseBuyPrice(AddOn
-      .createItem(item.itemLink))
+    local auctionHouseBuyPrice = AddOn.determineAuctionHouseBuyPrice(item)
     local sources = {}
     if npcBuyPrice then
       table.insert(sources, {
@@ -1367,7 +1370,7 @@ function _.compareQuality(a, b)
   end
 end
 
-function _.determineNPCBuyPrice(itemID)
+function _.determineNPCBuyPrice(item)
   return nil -- TODO: Implement
 end
 
