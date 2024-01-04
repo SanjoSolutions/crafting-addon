@@ -378,6 +378,16 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
         b.recipeData.reagentData.requiredReagents, function(reagent)
           return _.retrieveRecipeIDForItem(reagent.items[1].item) ==
             a.recipeID
+        end) or Array.any(
+        b.recipeData.reagentData.optionalReagentSlots, function(reagent)
+          return reagent.activeReagent and
+            _.retrieveRecipeIDForItem(reagent.activeReagent.item) ==
+            a.recipeID
+        end) or Array.any(
+        b.recipeData.reagentData.finishingReagentSlots, function(reagent)
+          return reagent.activeReagent and
+            _.retrieveRecipeIDForItem(reagent.activeReagent.item) ==
+            a.recipeID
         end)
       return doesBDependOnA or
         a.recipeData:GetAverageProfit() > b.recipeData:GetAverageProfit()
@@ -433,11 +443,42 @@ function AddOn.determineRecipeData(recipeID)
   -- FIXME: With CraftSim freshly installed, this seems to throw an error. It seems required to open the profession window once to fix the error.
   recipeData:SetEquippedProfessionGearSet()
   if not recipeData.hasQualityReagents then
-    for index, reagent in ipairs(recipeData.reagentData.requiredReagents) do
-      reagent.items[1].quantity = reagent.requiredQuantity
-    end
+    recipeData:SetNonQualityReagentsMax()
   end
   recipeData:OptimizeProfit()
+  -- TODO: Ooey-Gooey Chocolate
+  for index, slot in ipairs(recipeData.reagentData.finishingReagentSlots) do
+    local variants = {
+      {
+        itemID = nil,
+        profit = recipeData:GetAverageProfit(),
+      },
+    }
+    local itemIDs = {
+      197764,
+      197765,
+    }
+    for index, itemID in ipairs(itemIDs) do
+      if Array.any(slot.possibleReagents, function(reagent)
+          return reagent.item:GetItemID() == itemID
+        end) then
+        recipeData:SetOptionalReagent(itemID)
+        local profit = recipeData:GetAverageProfit()
+        slot.activeReagent = nil
+        table.insert(variants, {
+          itemID = itemID,
+          profit = profit,
+        })
+      end
+    end
+    local maxVariant = Array.max(variants, function(variant)
+      return variant.profit
+    end)
+    if maxVariant.itemID then
+      recipeData:SetOptionalReagent(maxVariant.itemID)
+    end
+  end
+
   -- When the profession window for the profession is closed this might be set to false by CraftSim even though the recipe is learned.
   -- We set it here to true so that CanCraft correctly works.
   recipeData.learned = true
@@ -940,6 +981,16 @@ function _.determineThingsRequiredPerCraftingTask(craftingTask)
       end
     end
   end)
+
+  for index, slot in ipairs(craftingTask.recipeData.reagentData.finishingReagentSlots) do
+    if slot.activeReagent then
+      local thingRequired = {
+        itemLink = slot.activeReagent.item:GetItemLink(),
+        amount = 1,
+      }
+      table.insert(thingsRequired, thingRequired)
+    end
+  end
 
   return thingsRequired
 end
