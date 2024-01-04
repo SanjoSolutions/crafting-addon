@@ -1383,7 +1383,11 @@ local npcPrices = {
 }
 
 function _.determineNPCBuyPrice(item)
-  return npcPrices[item:GetItemID()] or nil
+  local price = npcPrices[item:GetItemID()]
+  if price and IsSpellKnown(69044) then
+    price = price * (1 - 0.2)
+  end
+  return price
 end
 
 --- @param item Item
