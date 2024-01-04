@@ -181,8 +181,8 @@ function _.findRecipesToCraft()
                   .generateItemString(item)) or 0
                 local amountToPutIntoAuctionHouse = amountSoldPerDay *
                   window / 24
-                if amountToPutIntoAuctionHouse > 0 and amountToPutIntoAuctionHouse < 1 then
-                  amountToPutIntoAuctionHouse = 1
+                if amountToPutIntoAuctionHouse < 1 then
+                  amountToPutIntoAuctionHouse = 0
                 else
                   amountToPutIntoAuctionHouse = Mathematics.round(
                     amountToPutIntoAuctionHouse)
@@ -212,8 +212,8 @@ function _.findRecipesToCraft()
               .generateItemString(item)) or 0
             local amountToPutIntoAuctionHouse = amountSoldPerDay *
               window / 24
-            if amountToPutIntoAuctionHouse > 0 and amountToPutIntoAuctionHouse < 1 then
-              amountToPutIntoAuctionHouse = 1
+            if amountToPutIntoAuctionHouse < 1 then
+              amountToPutIntoAuctionHouse = 0
             else
               amountToPutIntoAuctionHouse = Mathematics.round(
                 amountToPutIntoAuctionHouse)
