@@ -156,7 +156,7 @@ function _.findRecipesToCraft()
 
   Array.forEach(Object.values(CraftingSavedVariablesPerCharacter.recipes),
     function(recipe)
-      if recipe.recipeInfo.learned and recipe.profession ~= 5 then -- other than cooking
+      if recipe.recipeInfo.learned then
         local recipeData = AddOn.determineRecipeData(recipe.recipeID)
 
         if recipeData and not Array.any(C_TradeSkillUI.GetRecipeRequirements(recipeData.recipeID), function(
@@ -164,6 +164,7 @@ function _.findRecipesToCraft()
             return requirement.name == "Earth-Warder's Forge"
           end) and recipeData:GetAverageProfit() > 0 then
           local window = 1 -- hour
+          local averageSoldPerDayMultiplier = 5 -- to account for that the stat has been derived from TSM users and that some players might not use TSM.
           if recipeData.supportsQualities then
             Array.create(Object.entries(recipeData
               .resultData.chanceByQuality)):forEach(function(entry)
@@ -180,6 +181,7 @@ function _.findRecipesToCraft()
                 local amountInAuctionHouse = TSM_API.GetAuctionQuantity(AddOn
                   .generateItemString(item)) or 0
                 local amountToPutIntoAuctionHouse = amountSoldPerDay *
+                  averageSoldPerDayMultiplier *
                   window / 24
                 if amountToPutIntoAuctionHouse < 1 then
                   amountToPutIntoAuctionHouse = 0
@@ -211,6 +213,7 @@ function _.findRecipesToCraft()
             local amountInAuctionHouse = TSM_API.GetAuctionQuantity(AddOn
               .generateItemString(item)) or 0
             local amountToPutIntoAuctionHouse = amountSoldPerDay *
+              averageSoldPerDayMultiplier *
               window / 24
             if amountToPutIntoAuctionHouse < 1 then
               amountToPutIntoAuctionHouse = 0
@@ -453,10 +456,8 @@ craftPlannedButton:SetScript("OnClick", function()
     local craftingTasks = groupedThingsToCraft[professionInfo.profession]
     if craftingTasks then
       for index, craftingTask in ipairs(craftingTasks) do
-        print(C_TradeSkillUI.GetRecipeLink(craftingTask.recipeID))
         local canCraft, craftableAmount = craftingTask.recipeData:CanCraft(
           craftingTask:determineAmountRemainingToCraft())
-        DevTools_Dump(craftingTask.recipeData.reagentData:Debug())
         if craftableAmount >= 1 then
           local listener
           listener = Events.listenForEvent("TRADE_SKILL_CLOSE", function()
@@ -473,15 +474,12 @@ craftPlannedButton:SetScript("OnClick", function()
           end)
           local event
           while craftingTask:determineAmountRemainingToCraft() >= 1 do
-            print("event2", event)
             if event == "UPDATE_TRADESKILL_CAST_STOPPED" or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_STOP" then
               -- Wait a bit so that item counts are up to date.
-              print("wait a bit")
               Coroutine.waitForDuration(1)
             end
             local canCraft, craftableAmount = craftingTask.recipeData:CanCraft(
               craftingTask:determineAmountRemainingToCraft())
-            print("craftableAmount", craftableAmount)
             if craftableAmount >= 1 then
               local amountToCraft = min(craftableAmount,
                 craftingTask:determineAmountRemainingToCraft())
@@ -508,7 +506,6 @@ craftPlannedButton:SetScript("OnClick", function()
                   end)
                 craftingTask.recipeData:Craft(amountToCraft)
                 if not hasSpellCastFailed then
-                  print(1)
                   local events = {
                     "UPDATE_TRADESKILL_CAST_STOPPED",
                     "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_FAILED",
@@ -527,7 +524,6 @@ craftPlannedButton:SetScript("OnClick", function()
                         return true
                       end
                     end))
-                  print(2)
                   if event == "TRADE_SKILL_CLOSE" then
                     listener2:stopListening()
                     listener3:stopListening()

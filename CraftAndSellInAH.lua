@@ -1370,8 +1370,20 @@ function _.compareQuality(a, b)
   end
 end
 
+local npcPrices = {
+  -- Cooking
+  [197749] = 1000,
+  [197750] = 3000,
+  [197751] = 5000,
+  [197752] = 12500,
+  [197753] = 30000,
+  -- Other
+  [190452] = 150000,
+  [191474] = 50000,
+}
+
 function _.determineNPCBuyPrice(item)
-  return nil -- TODO: Implement
+  return npcPrices[item:GetItemID()] or nil
 end
 
 --- @param item Item
