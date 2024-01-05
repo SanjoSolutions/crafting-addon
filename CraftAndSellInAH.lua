@@ -720,8 +720,8 @@ end
 function _.retrieveNumberOfCharges(containerIndex, slotIndex)
   local tooltipData = C_TooltipInfo.GetBagItem(containerIndex, slotIndex)
   TooltipUtil.SurfaceArgs(tooltipData)
-  local numberOfChargesAsString = string.match(tooltipData[3].leftText,
-    "(%d+) |4Charges:Charges;")
+  local numberOfChargesAsString = string.match(tooltipData.lines[3].leftText,
+    "(%d+) |4Charge:Charges;")
   if numberOfChargesAsString then
     return tonumber(numberOfChargesAsString)
   else
@@ -823,22 +823,17 @@ function _.addItemToInventory(inventory, item)
   local itemLink = item:GetItemLink()
 
   if not inventory[AddOn.SourceType.Bag][itemLink] then
-    local itemString = AddOn.generateItemString(item)
-    inventory[AddOn.SourceType.Bag][itemLink] = TSM_API.GetBagQuantity(
-      itemString)
+    inventory[AddOn.SourceType.Bag][itemLink] = AddOn.determineBagQuantity(item)
   end
 
   if not inventory[AddOn.SourceType.Bank][itemLink] then
-    local itemString = AddOn.generateItemString(item)
-    inventory[AddOn.SourceType.Bank][itemLink] = TSM_API.GetBankQuantity(
-      itemString)
+    inventory[AddOn.SourceType.Bank][itemLink] = AddOn.determineBankQuantity(
+      item)
   end
 
   if not inventory[AddOn.SourceType.ReagentBank][itemLink] then
-    local itemString = AddOn.generateItemString(item)
-    inventory[AddOn.SourceType.ReagentBank][itemLink] = TSM_API
-      .GetReagentBankQuantity(
-        itemString)
+    inventory[AddOn.SourceType.ReagentBank][itemLink] = AddOn
+      .determineReagentBankQuantity(item)
   end
 
   if not inventory[AddOn.SourceType.Mail][itemLink] then
@@ -1157,10 +1152,26 @@ function _.join(itemLinks)
   return string
 end
 
-function _.determineAmountInInventory(itemString)
-  return TSM_API.GetBagQuantity(itemString) + TSM_API.GetBankQuantity(itemString) +
-    TSM_API.GetReagentBankQuantity(itemString) +
-    TSM_API.GetMailQuantity(itemString) + TSM_API.GetGuildQuantity(itemString)
+--- @type item Item
+--- @return Amount
+function AddOn.determineBagQuantity(item)
+  return GetItemCount(item:GetItemLink())
+end
+
+--- @type item Item
+--- @return Amount
+function AddOn.determineBankQuantity(item)
+  local itemLink = item:GetItemLink()
+  return GetItemCount(itemLink, true) -
+    GetItemCount(itemLink)
+end
+
+--- @type item Item
+--- @return Amount
+function AddOn.determineReagentBankQuantity(item)
+  local itemLink = item:GetItemLink()
+  return GetItemCount(itemLink,
+    nil, nil, true) - GetItemCount(itemLink)
 end
 
 --- @param item Item

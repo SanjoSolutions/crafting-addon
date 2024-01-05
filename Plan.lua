@@ -134,11 +134,15 @@ sellButton:SetScript("OnClick", function()
         function(thingToCraft)
           local item = AddOn.createItem(thingToCraft.itemLink)
           AddOn.loadItem(item)
+          local bagQuantity = AddOn.determineBagQuantity(item)
           local itemString = AddOn.generateItemString(item)
-          local bagQuantity = TSM_API.GetBagQuantity(itemString)
           local amount = min(
             thingToCraft.amount - (TSM_API.GetAuctionQuantity(itemString) or 0),
             bagQuantity)
+          if item:GetItemID() == 191304 then
+            print("a", amount, thingToCraft.amount,
+              TSM_API.GetAuctionQuantity(itemString), bagQuantity)
+          end
           return {
             itemLink = thingToCraft.itemLink,
             amount = amount,
