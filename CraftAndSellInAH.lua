@@ -567,6 +567,11 @@ AddOn.sell = function(sellTasks)
   print("Have worked through the full list.")
 end
 
+-- itemID -> maximum number of charges
+local itemsWithCharges = {
+  [191304] = 20,
+}
+
 --- @param sellTask SellTask
 function _.doSellTask(sellTask)
   local item = AddOn.createItem(sellTask.itemLink)
@@ -629,7 +634,9 @@ function _.doSellTask(sellTask)
           slotIndex)
         return slotItemID == itemID and
           not C_Item.IsBound(ItemLocation:CreateFromBagAndSlot(containerIndex,
-            slotIndex)) and not Array.any(boundItems, function(boundItem)
+            slotIndex)) and
+          (not itemsWithCharges[itemID] or _.retrieveNumberOfCharges(containerIndex, slotIndex) == itemsWithCharges[itemID]) and
+          not Array.any(boundItems, function(boundItem)
             return boundItem[1] == containerIndex and boundItem[2] == slotIndex
           end)
       end)
@@ -704,6 +711,18 @@ function _.doSellTask(sellTask)
   end
 end
 
+function _.retrieveNumberOfCharges(containerIndex, slotIndex)
+  local tooltipData = C_TooltipInfo.GetBagItem(containerIndex, slotIndex)
+  TooltipUtil.SurfaceArgs(tooltipData)
+  local numberOfChargesAsString = string.match(tooltipData[3].leftText,
+    "(%d+) |4Charges:Charges;")
+  if numberOfChargesAsString then
+    return tonumber(numberOfChargesAsString)
+  else
+    return nil
+  end
+end
+
 function _.determineUnitPriceForCommodity(itemID)
   local numberOfCommoditySearchResults = C_AuctionHouse
     .GetNumCommoditySearchResults(itemID)
@@ -723,7 +742,7 @@ function _.determineUnitPriceForItem(itemKey)
   local result = _.retrieveLowestBuyoutAmountResult(itemKey)
   if result then
     local unitPrice = result.buyoutAmount
-    if result.owners[1] == UnitName("player") then
+    if result.owners[1] ~= UnitName("player") then
       unitPrice = math.max(unitPrice - 100, 100)
     end
     return unitPrice
