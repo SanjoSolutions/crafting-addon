@@ -139,10 +139,6 @@ sellButton:SetScript("OnClick", function()
           local amount = min(
             thingToCraft.amount - (TSM_API.GetAuctionQuantity(itemString) or 0),
             bagQuantity)
-          if item:GetItemID() == 191304 then
-            print("a", amount, thingToCraft.amount,
-              TSM_API.GetAuctionQuantity(itemString), bagQuantity)
-          end
           return {
             itemLink = thingToCraft.itemLink,
             amount = amount,
