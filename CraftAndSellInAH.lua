@@ -71,6 +71,7 @@ end
 --- @class ItemToRetrieve
 --- @field itemLink ItemLink
 --- @field amount number
+--- @field amountRetrieved number
 --- @field maximumPurchasePrice Money|nil
 
 --- @enum SourceType
@@ -85,6 +86,7 @@ AddOn.SourceType = {
   Bag = 8,
   Bank = 9,
   ReagentBank = 10,
+  AuctionHouseCancelling = 11,
 }
 
 --- @class BestSourcesEntry
@@ -141,6 +143,7 @@ local sourceTypeToName = {
   [AddOn.SourceType.Bag] = "bag",
   [AddOn.SourceType.Bank] = "bank",
   [AddOn.SourceType.ReagentBank] = "reagent bank",
+  [AddOn.SourceType.AuctionHouseCancelling] = "auction house (cancelling)",
 }
 
 --- @param thingsToRetrieve ThingsToRetrieveStep[]
@@ -215,6 +218,7 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
     [AddOn.SourceType.Mail] = {},
     [AddOn.SourceType.GuildBank] = {},
     [AddOn.SourceType.OtherCharacter] = {},
+    [AddOn.SourceType.AuctionHouseCancelling] = {},
   }
 
   Array.forEach(thingsToCraft, function(thingToCraft)
@@ -358,7 +362,12 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
     if groups[source] then
       table.insert(list, {
         source = source,
-        thingsToRetrieveFromSource = Object.values(groups[source]),
+        thingsToRetrieveFromSource = Array.map(Object.values(groups[source]),
+          function(
+            groupEntry)
+            groupEntry.amountRetrieved = 0
+            return groupEntry
+          end),
       })
     end
   end)
@@ -500,13 +509,17 @@ local sorts = {
 }
 
 --- @param purchaseTasks PurchaseTask[]
-AddOn.buy = function(purchaseTasks)
-  Array.forEach(purchaseTasks, _.purchase)
+--- @param callback fun(purchaseTask: PurchaseTask, quantity: Amount): nil
+AddOn.buy = function(purchaseTasks, callback)
+  Array.forEach(purchaseTasks, function(purchaseTask)
+    _.purchase(purchaseTask, callback)
+  end)
   print("Have worked through the full purchase list.")
 end
 
---- @param buyTask PurchaseTask
-function _.purchase(purchaseTask)
+--- @param purchaseTask PurchaseTask
+--- @param callback fun(purchaseTask: PurchaseTask, quantity: Amount): nil
+function _.purchase(purchaseTask, callback)
   local quantity = purchaseTask.amount
   local maximumUnitPriceToBuyFor = purchaseTask.maximumUnitPriceToBuyFor
 
@@ -547,6 +560,7 @@ function _.purchase(purchaseTask)
             " x " ..
             itemLink ..
             " (for a unit price of " .. GetMoneyString(unitPrice) .. ").")
+          callback(purchaseTask, quantity)
         else
           print("Have skipped buying " ..
             quantity ..
@@ -848,6 +862,12 @@ function _.addItemToInventory(inventory, item)
       itemString)
   end
 
+  if not inventory[AddOn.SourceType.AuctionHouseCancelling][itemLink] then
+    local itemString = AddOn.generateItemString(item)
+    inventory[AddOn.SourceType.AuctionHouseCancelling][itemLink] = TSM_API
+      .GetAuctionQuantity(itemString)
+  end
+
   -- TODO: Other characters
 end
 
@@ -1128,6 +1148,11 @@ function AddOn.generateThingsToRetrieveFromSourceText(sourceType,
     Array.forEach(thingsToRetrieve, function(thingToRetrieve)
       local itemLink = thingToRetrieve.itemLink
       local line = "  " .. thingToRetrieve.amount .. " x " .. itemLink
+      if sourceType == AddOn.SourceType.AuctionHouse then
+        line = line .. " (" ..
+          thingToRetrieve.amountRetrieved ..
+          " / " .. thingToRetrieve.amount .. ")"
+      end
       text = text .. "\n" .. line
     end)
   end
@@ -1152,13 +1177,24 @@ function _.join(itemLinks)
   return string
 end
 
---- @type item Item
+--- @param item Item
+--- @return Amount
+function AddOn.determineTotalInventoryAmount(item)
+  local itemString = AddOn.generateItemString(item)
+  return GetItemCount(item:GetItemLink(), true, nil, true) +
+    TSM_API.GetMailQuantity(
+      itemString) + TSM_API.GetGuildQuantity(
+      itemString) + TSM_API
+    .GetAuctionQuantity(itemString)
+end
+
+--- @param item Item
 --- @return Amount
 function AddOn.determineBagQuantity(item)
   return GetItemCount(item:GetItemLink())
 end
 
---- @type item Item
+--- @param item Item
 --- @return Amount
 function AddOn.determineBankQuantity(item)
   local itemLink = item:GetItemLink()
@@ -1166,7 +1202,7 @@ function AddOn.determineBankQuantity(item)
     GetItemCount(itemLink)
 end
 
---- @type item Item
+--- @param item Item
 --- @return Amount
 function AddOn.determineReagentBankQuantity(item)
   local itemLink = item:GetItemLink()
@@ -1332,6 +1368,7 @@ function _.retrieveFromInventory(inventory, itemLink, amount)
     AddOn.SourceType.Mail,
     AddOn.SourceType.GuildBank,
     AddOn.SourceType.OtherCharacter,
+    AddOn.SourceType.AuctionHouseCancelling,
   }
 
   --- @type Retrieval

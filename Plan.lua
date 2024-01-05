@@ -109,16 +109,25 @@ buyButton:SetScript("OnClick", function()
       function(thingToRetrieve)
         return thingToRetrieve.source == AddOn.SourceType.AuctionHouse
       end).thingsToRetrieveFromSource
-    local buyTasks = Array.map(thingsToRetrieveFromAH, function(thingToRetrieve)
-      local item = AddOn.createItem(thingToRetrieve.itemLink)
-      AddOn.loadItem(item)
-      return {
-        itemLink = thingToRetrieve.itemLink,
-        amount = thingToRetrieve.amount,
-        maximumUnitPriceToBuyFor = thingToRetrieve.maximumPurchasePrice,
-      }
+    local purchaseTaskToThingToRetrieve = {}
+    local purchaseTasks = Array.map(thingsToRetrieveFromAH,
+      function(thingToRetrieve)
+        local item = AddOn.createItem(thingToRetrieve.itemLink)
+        AddOn.loadItem(item)
+        local amount = thingToRetrieve.amount - thingToRetrieve.amountRetrieved
+        local purchaseTask = {
+          itemLink = thingToRetrieve.itemLink,
+          amount = amount,
+          maximumUnitPriceToBuyFor = thingToRetrieve.maximumPurchasePrice,
+        }
+        purchaseTaskToThingToRetrieve[purchaseTask] = thingToRetrieve
+        return purchaseTask
+      end):filter(function(task) return task.amount >= 1 end)
+    AddOn.buy(purchaseTasks, function(purchaseTask, amount)
+      local thingToRetrieve = purchaseTaskToThingToRetrieve[purchaseTask]
+      thingToRetrieve.amountRetrieved = thingToRetrieve.amountRetrieved + amount
+      _.updatePlanText()
     end)
-    AddOn.buy(buyTasks)
   end)
 end)
 
