@@ -136,7 +136,9 @@ sellButton:SetScript("OnClick", function()
           AddOn.loadItem(item)
           local itemString = AddOn.generateItemString(item)
           local bagQuantity = TSM_API.GetBagQuantity(itemString)
-          local amount = min(thingToCraft.amount, bagQuantity)
+          local amount = min(
+            thingToCraft.amount - (TSM_API.GetAuctionQuantity(itemString) or 0),
+            bagQuantity)
           return {
             itemLink = thingToCraft.itemLink,
             amount = amount,
@@ -164,7 +166,7 @@ function _.findRecipesToCraft()
             return requirement.name == "Earth-Warder's Forge"
           end) and recipeData:GetAverageProfit() > 0 then
           local window = 1 -- hour
-          local averageSoldPerDayMultiplier = 5 -- to account for that the stat has been derived from TSM users and that some players might not use TSM.
+          local averageSoldPerDayMultiplier = 2 -- to account for that the stat has been derived from TSM users and that some players might not use TSM.
           if recipeData.supportsQualities then
             Array.create(Object.entries(recipeData
               .resultData.chanceByQuality)):forEach(function(entry)
@@ -456,87 +458,91 @@ craftPlannedButton:SetScript("OnClick", function()
     local craftingTasks = groupedThingsToCraft[professionInfo.profession]
     if craftingTasks then
       for index, craftingTask in ipairs(craftingTasks) do
-        local canCraft, craftableAmount = craftingTask.recipeData:CanCraft(
-          craftingTask:determineAmountRemainingToCraft())
-        if craftableAmount >= 1 then
-          local listener
-          listener = Events.listenForEvent("TRADE_SKILL_CLOSE", function()
-            CraftAndSellInAH.cancel()
-            listener:stopListening()
-          end)
-          Professions.SetDefaultFilters()
-          SearchBoxTemplate_ClearText(ProfessionsFrame.CraftingPage.RecipeList
-            .SearchBox)
-          C_TradeSkillUI.OpenRecipe(craftingTask.recipeData.recipeID)
-          craftingTask.recipeData.professionGearSet:Equip()
-          Coroutine.waitFor(function()
-            return CraftSim.TOPGEAR.IsEquipping == false
-          end)
-          local event
-          while craftingTask:determineAmountRemainingToCraft() >= 1 do
-            if event == "UPDATE_TRADESKILL_CAST_STOPPED" or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_STOP" then
-              -- Wait a bit so that item counts are up to date.
-              Coroutine.waitForDuration(1)
-            end
-            local canCraft, craftableAmount = craftingTask.recipeData:CanCraft(
-              craftingTask:determineAmountRemainingToCraft())
-            if craftableAmount >= 1 then
-              local amountToCraft = min(craftableAmount,
-                craftingTask:determineAmountRemainingToCraft())
-              print("Going to craft " ..
-                amountToCraft ..
-                " x " ..
-                C_TradeSkillUI.GetRecipeLink(craftingTask.recipeID) .. ".")
-              if CraftAndSellInAH.showConfirmButton() then
-                local hasSpellCastFailed = false
-                local listener2 = Events.listenForEvent("UNIT_SPELLCAST_FAILED",
-                  function(event, unitTarget)
-                    if unitTarget == "player" then
-                      hasSpellCastFailed = true
-                    end
-                  end)
-                local listener3 = Events.listenForEvent(
-                  "UNIT_SPELLCAST_SUCCEEDED",
-                  function(event, unitTarget, castGUID, spellID)
-                    if unitTarget == "player" and spellID == craftingTask.recipeID then
-                      craftingTask.amountCrafted = craftingTask.amountCrafted +
-                        1
-                      _.updatePlanText()
-                    end
-                  end)
-                craftingTask.recipeData:Craft(amountToCraft)
-                if not hasSpellCastFailed then
-                  local events = {
-                    "UPDATE_TRADESKILL_CAST_STOPPED",
-                    "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_FAILED",
-                    "TRADE_SKILL_CLOSE", "UNIT_SPELLCAST_FAILED_QUIET",
-                  }
-                  if amountToCraft == 1 then
-                    Array.append(events, { "UNIT_SPELLCAST_SUCCEEDED",
-                      "UNIT_SPELLCAST_STOP", })
-                  end
-                  event = select(2, Events.waitForOneOfEventsAndCondition(events,
-                    function(self, event, unitTarget)
-                      print("event", event, unitTarget)
-                      if event == "UNIT_SPELLCAST_FAILED_QUIET" or event == "UNIT_SPELLCAST_INTERRUPTED" or event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_STOP" then
-                        return unitTarget == "player"
-                      else
-                        return true
-                      end
-                    end))
-                  if event == "TRADE_SKILL_CLOSE" then
-                    listener2:stopListening()
-                    listener3:stopListening()
-                    return
-                  end
-                end
-                listener2:stopListening()
-                listener3:stopListening()
-              else
-                return
+        if craftingTask:determineAmountRemainingToCraft() >= 1 then
+          local craftableAmount = select(2, craftingTask.recipeData:CanCraft(
+            craftingTask:determineAmountRemainingToCraft()))
+          if craftableAmount >= 1 then
+            local listener
+            listener = Events.listenForEvent("TRADE_SKILL_CLOSE", function()
+              CraftAndSellInAH.cancel()
+              listener:stopListening()
+            end)
+            Professions.SetDefaultFilters()
+            SearchBoxTemplate_ClearText(ProfessionsFrame.CraftingPage.RecipeList
+              .SearchBox)
+            C_TradeSkillUI.OpenRecipe(craftingTask.recipeData.recipeID)
+            craftingTask.recipeData.professionGearSet:Equip()
+            Coroutine.waitFor(function()
+              return CraftSim.TOPGEAR.IsEquipping == false
+            end)
+            local event
+            while craftingTask:determineAmountRemainingToCraft() >= 1 do
+              if event == "UPDATE_TRADESKILL_CAST_STOPPED" or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_STOP" then
+                -- Wait a bit so that item counts are up to date.
+                Coroutine.waitForDuration(1)
               end
-            else
-              break
+              local craftableAmount = select(2, craftingTask.recipeData:CanCraft(
+                craftingTask:determineAmountRemainingToCraft()))
+              if craftableAmount >= 1 then
+                local amountToCraft = min(craftableAmount,
+                  craftingTask:determineAmountRemainingToCraft())
+                print("Going to craft " ..
+                  amountToCraft ..
+                  " x " ..
+                  C_TradeSkillUI.GetRecipeLink(craftingTask.recipeID) .. ".")
+                if CraftAndSellInAH.showConfirmButton() then
+                  local hasSpellCastFailed = false
+                  local listener2 = Events.listenForEvent(
+                    "UNIT_SPELLCAST_FAILED",
+                    function(event, unitTarget)
+                      if unitTarget == "player" then
+                        hasSpellCastFailed = true
+                      end
+                    end)
+                  local listener3 = Events.listenForEvent(
+                    "UNIT_SPELLCAST_SUCCEEDED",
+                    function(event, unitTarget, castGUID, spellID)
+                      if unitTarget == "player" and spellID == craftingTask.recipeID then
+                        craftingTask.amountCrafted = craftingTask.amountCrafted +
+                          1
+                        _.updatePlanText()
+                      end
+                    end)
+                  craftingTask.recipeData:Craft(amountToCraft)
+                  if not hasSpellCastFailed then
+                    local events = {
+                      "UPDATE_TRADESKILL_CAST_STOPPED",
+                      "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_FAILED",
+                      "TRADE_SKILL_CLOSE", "UNIT_SPELLCAST_FAILED_QUIET",
+                    }
+                    if amountToCraft == 1 then
+                      Array.append(events, { "UNIT_SPELLCAST_SUCCEEDED",
+                        "UNIT_SPELLCAST_STOP", })
+                    end
+                    event = select(2,
+                      Events.waitForOneOfEventsAndCondition(events,
+                        function(self, event, unitTarget)
+                          print("event", event, unitTarget)
+                          if event == "UNIT_SPELLCAST_FAILED_QUIET" or event == "UNIT_SPELLCAST_INTERRUPTED" or event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_STOP" then
+                            return unitTarget == "player"
+                          else
+                            return true
+                          end
+                        end))
+                    if event == "TRADE_SKILL_CLOSE" then
+                      listener2:stopListening()
+                      listener3:stopListening()
+                      return
+                    end
+                  end
+                  listener2:stopListening()
+                  listener3:stopListening()
+                else
+                  return
+                end
+              else
+                break
+              end
             end
           end
         end

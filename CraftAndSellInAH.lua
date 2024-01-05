@@ -374,6 +374,10 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
   Array.create(Object.values(groupedThingsToCraft)):forEach(function(
     craftingTasks)
     table.sort(craftingTasks, function(a, b)
+      if not a or not b then
+        return false
+      end
+
       local doesBDependOnA = Array.any(
         b.recipeData.reagentData.requiredReagents, function(reagent)
           return _.retrieveRecipeIDForItem(reagent.items[1].item) ==
@@ -463,8 +467,10 @@ function AddOn.determineRecipeData(recipeID)
           return reagent.item:GetItemID() == itemID
         end) then
         recipeData:SetOptionalReagent(itemID)
+        recipeData:Update()
         local profit = recipeData:GetAverageProfit()
         slot.activeReagent = nil
+        recipeData:Update()
         table.insert(variants, {
           itemID = itemID,
           profit = profit,
@@ -1449,6 +1455,8 @@ local npcPrices = {
   [197751] = 5000,
   [197752] = 12500,
   [197753] = 30000,
+  [194683] = 25000,
+  [194691] = 25000,
   -- Other
   [190452] = 150000,
   [191474] = 50000,
