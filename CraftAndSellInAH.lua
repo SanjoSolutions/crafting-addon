@@ -1269,15 +1269,20 @@ function _.determineCraftingCost(item)
   local recipeID = _.retrieveRecipeIDForItem(item)
   if recipeID then
     local recipeData = AddOn.determineRecipeData(recipeID)
-    local quality = Array.findIndex(recipeData.resultData.itemsByQuality,
-      function(item2)
-        return item2:GetItemLink() == item:GetItemLink()
-      end)
-    if quality and recipeData.resultData.chanceByQuality[quality] == 1 then
+    if recipeData.supportsQualities then
+      local quality = Array.findIndex(recipeData.resultData.itemsByQuality,
+        function(item2)
+          return item2:GetItemLink() == item:GetItemLink()
+        end)
+      if quality and recipeData.resultData.chanceByQuality[quality] == 1 then
+        return recipeData.priceData.craftingCosts /
+          AddOn.determineAverageAmountProducedByRecipe(recipeData)
+      else
+        return nil
+      end
+    else
       return recipeData.priceData.craftingCosts /
         AddOn.determineAverageAmountProducedByRecipe(recipeData)
-    else
-      return nil
     end
   else
     return nil
