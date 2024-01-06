@@ -354,6 +354,7 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
     AddOn.SourceType.GuildBank,
     AddOn.SourceType.NPCVendor,
     AddOn.SourceType.AuctionHouse,
+    AddOn.SourceType.AuctionHouseCancelling,
     AddOn.SourceType.OtherCharacter,
     AddOn.SourceType.Elsewhere,
     AddOn.SourceType.Crafting,
@@ -380,34 +381,74 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
         .profession
     end)
 
-  Array.create(Object.values(groupedThingsToCraft)):forEach(function(
-    craftingTasks)
-    table.sort(craftingTasks, function(a, b)
-      if not a or not b then
-        return false
-      end
-
-      local doesBDependOnA = Array.any(
-        b.recipeData.reagentData.requiredReagents, function(reagent)
-          return _.retrieveRecipeIDForItem(reagent.items[1].item) ==
-            a.recipeID
-        end) or Array.any(
-        b.recipeData.reagentData.optionalReagentSlots, function(reagent)
-          return reagent.activeReagent and
-            _.retrieveRecipeIDForItem(reagent.activeReagent.item) ==
-            a.recipeID
-        end) or Array.any(
-        b.recipeData.reagentData.finishingReagentSlots, function(reagent)
-          return reagent.activeReagent and
-            _.retrieveRecipeIDForItem(reagent.activeReagent.item) ==
-            a.recipeID
-        end)
-      return doesBDependOnA or
-        a.recipeData:GetAverageProfit() > b.recipeData:GetAverageProfit()
-    end)
-  end)
+  for source, craftingTasks in pairs(groupedThingsToCraft) do
+    groupedThingsToCraft[source] = _.sortByDependency(craftingTasks)
+  end
 
   return list, groupedThingsToCraft
+end
+
+--- @param craftingTasks CraftingTask[]
+--- @return CraftingTask[]
+function _.sortByDependency(craftingTasks)
+  local craftingTaskLookUp = {}
+  for index, craftingTask in ipairs(craftingTasks) do
+    craftingTaskLookUp[craftingTask.recipeID] = craftingTask
+  end
+
+  local sorted = {}
+  local visited = Set.create()
+
+  local visitDependencies
+
+  --- @param craftingTask CraftingTask
+  local function visit(craftingTask)
+    if not visited:contains(craftingTask) then
+      visited:add(craftingTask)
+      visitDependencies(craftingTask)
+      table.insert(sorted, craftingTask)
+    end
+  end
+
+  --- @param craftingTask CraftingTask
+  visitDependencies = function(craftingTask)
+    Array.forEach(craftingTask.recipeData.reagentData.requiredReagents,
+      function(reagent)
+        local recipeID = _.retrieveRecipeIDForItem(reagent.items[1].item)
+        local craftingTask2 = craftingTaskLookUp[recipeID]
+        if craftingTask2 then
+          visit(craftingTask2)
+        end
+      end)
+
+    Array.forEach(craftingTask.recipeData.reagentData.optionalReagentSlots,
+      function(reagent)
+        if reagent.activeReagent then
+          local recipeID = _.retrieveRecipeIDForItem(reagent.activeReagent.item)
+          local craftingTask2 = craftingTaskLookUp[recipeID]
+          if craftingTask2 then
+            visit(craftingTask2)
+          end
+        end
+      end)
+
+    Array.forEach(craftingTask.recipeData.reagentData.finishingReagentSlots,
+      function(reagent)
+        if reagent.activeReagent then
+          local recipeID = _.retrieveRecipeIDForItem(reagent.activeReagent.item)
+          local craftingTask2 = craftingTaskLookUp[recipeID]
+          if craftingTask2 then
+            visit(craftingTask2)
+          end
+        end
+      end)
+  end
+
+  for index, craftingTask in ipairs(craftingTasks) do
+    visit(craftingTask)
+  end
+
+  return sorted
 end
 
 local bestStatsForClasses = {
@@ -862,11 +903,12 @@ function _.addItemToInventory(inventory, item)
       itemString)
   end
 
-  if not inventory[AddOn.SourceType.AuctionHouseCancelling][itemLink] then
-    local itemString = AddOn.generateItemString(item)
-    inventory[AddOn.SourceType.AuctionHouseCancelling][itemLink] = TSM_API
-      .GetAuctionQuantity(itemString)
-  end
+  -- TODO: Maybe only consider the items for cancelling which are estimated to run out.
+  -- if not inventory[AddOn.SourceType.AuctionHouseCancelling][itemLink] then
+  --   local itemString = AddOn.generateItemString(item)
+  --   inventory[AddOn.SourceType.AuctionHouseCancelling][itemLink] = TSM_API
+  --     .GetAuctionQuantity(itemString)
+  -- end
 
   -- TODO: Other characters
 end
