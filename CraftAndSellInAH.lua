@@ -382,7 +382,7 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
     end)
 
   for source, craftingTasks in pairs(groupedThingsToCraft) do
-    groupedThingsToCraft[source] = _.sortByDependency(craftingTasks)
+    groupedThingsToCraft[source] = _.sortByDependencyAndProfit(craftingTasks)
   end
 
   return list, groupedThingsToCraft
@@ -390,7 +390,7 @@ end
 
 --- @param craftingTasks CraftingTask[]
 --- @return CraftingTask[]
-function _.sortByDependency(craftingTasks)
+function _.sortByDependencyAndProfit(craftingTasks)
   local craftingTaskLookUp = {}
   for index, craftingTask in ipairs(craftingTasks) do
     craftingTaskLookUp[craftingTask.recipeID] = craftingTask
@@ -412,12 +412,14 @@ function _.sortByDependency(craftingTasks)
 
   --- @param craftingTask CraftingTask
   visitDependencies = function(craftingTask)
+    local dependencies = {}
+
     Array.forEach(craftingTask.recipeData.reagentData.requiredReagents,
       function(reagent)
         local recipeID = _.retrieveRecipeIDForItem(reagent.items[1].item)
         local craftingTask2 = craftingTaskLookUp[recipeID]
         if craftingTask2 then
-          visit(craftingTask2)
+          table.insert(dependencies, craftingTask2)
         end
       end)
 
@@ -427,7 +429,7 @@ function _.sortByDependency(craftingTasks)
           local recipeID = _.retrieveRecipeIDForItem(reagent.activeReagent.item)
           local craftingTask2 = craftingTaskLookUp[recipeID]
           if craftingTask2 then
-            visit(craftingTask2)
+            table.insert(dependencies, craftingTask2)
           end
         end
       end)
@@ -438,15 +440,23 @@ function _.sortByDependency(craftingTasks)
           local recipeID = _.retrieveRecipeIDForItem(reagent.activeReagent.item)
           local craftingTask2 = craftingTaskLookUp[recipeID]
           if craftingTask2 then
-            visit(craftingTask2)
+            table.insert(dependencies, craftingTask2)
           end
         end
       end)
+
+    table.sort(dependencies, function(a, b)
+      return a.recipeData:GetAverageProfit() > b.recipeData:GetAverageProfit()
+    end)
+
+    Array.forEach(dependencies, visit)
   end
 
-  for index, craftingTask in ipairs(craftingTasks) do
-    visit(craftingTask)
-  end
+  table.sort(craftingTasks, function(a, b)
+    return a.recipeData:GetAverageProfit() > b.recipeData:GetAverageProfit()
+  end)
+
+  Array.forEach(craftingTasks, visit)
 
   return sorted
 end
