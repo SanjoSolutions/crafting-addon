@@ -522,7 +522,7 @@ craftPlannedButton:SetScript("OnClick", function()
                     local events = {
                       "UPDATE_TRADESKILL_CAST_STOPPED",
                       "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_FAILED",
-                      "TRADE_SKILL_CLOSE", "UNIT_SPELLCAST_FAILED_QUIET",
+                      "TRADE_SKILL_CLOSE",
                     }
                     if amountToCraft == 1 then
                       Array.append(events, { "UNIT_SPELLCAST_SUCCEEDED",
@@ -531,8 +531,7 @@ craftPlannedButton:SetScript("OnClick", function()
                     event = select(2,
                       Events.waitForOneOfEventsAndCondition(events,
                         function(self, event, unitTarget)
-                          print("event", event, unitTarget)
-                          if event == "UNIT_SPELLCAST_FAILED_QUIET" or event == "UNIT_SPELLCAST_INTERRUPTED" or event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_STOP" then
+                          if event == "UNIT_SPELLCAST_INTERRUPTED" or event == "UNIT_SPELLCAST_FAILED" or event == "UNIT_SPELLCAST_SUCCEEDED" or event == "UNIT_SPELLCAST_STOP" then
                             return unitTarget == "player"
                           else
                             return true
