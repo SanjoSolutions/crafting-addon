@@ -2,6 +2,8 @@
 
 Highly automated and optimized crafting and selling of the crafted items.
 
+__Info:__ The last release is currently outdated. Please clonse or download the repo and install the dependencies with NPM.
+
 ## Features
 
 * Determine what craftable items to put into the auction house.
