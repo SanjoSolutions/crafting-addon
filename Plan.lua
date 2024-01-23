@@ -23,6 +23,8 @@ local craftingPage = ProfessionsFrame.CraftingPage
 
 local inputDisplay = ChatFrame4
 local planDisplay = ChatFrame5
+inputDisplay:SetMaxLines(5000)
+planDisplay:SetMaxLines(5000)
 
 --- @type ThingsToRetrieveStepsList
 local thingsToRetrieve
@@ -167,7 +169,7 @@ function _.findRecipesToCraft()
 
   Array.forEach(Object.values(CraftingSavedVariablesPerCharacter.recipes),
     function(recipe)
-      if recipe.recipeInfo.learned then
+      if recipe.recipeInfo.learned and recipe.recipeID ~= 381417 then
         local recipeData = AddOn.determineRecipeData(recipe.recipeID)
 
         if recipeData and not Array.any(C_TradeSkillUI.GetRecipeRequirements(recipeData.recipeID), function(
@@ -175,7 +177,7 @@ function _.findRecipesToCraft()
             return requirement.name == "Earth-Warder's Forge"
           end) and recipeData:GetAverageProfit() > 0 then
           local window = 1 -- hour
-          local averageSoldPerDayMultiplier = 2 -- to account for that the stat has been derived from TSM users and that some players might not use TSM.
+          local averageSoldPerDayMultiplier = 1 -- to account for that the stat has been derived from TSM users and that some players might not use TSM.
           if recipeData.supportsQualities then
             Array.create(Object.entries(recipeData
               .resultData.chanceByQuality)):forEach(function(entry)
@@ -189,8 +191,8 @@ function _.findRecipesToCraft()
                   "dbregionsoldperday*10000",
                   AddOn.generateItemString(item, false)
                 ) or 0) / 10000
-                local amountInAuctionHouse = TSM_API.GetAuctionQuantity(AddOn
-                  .generateItemString(item)) or 0
+                local amountInAuctionHouse = AddOn
+                  .determineTotalAmountInAuctionHouse(item)
                 local amountToPutIntoAuctionHouse = amountSoldPerDay *
                   averageSoldPerDayMultiplier *
                   window / 24
@@ -221,8 +223,8 @@ function _.findRecipesToCraft()
               "dbregionsoldperday*10000",
               AddOn.generateItemString(item)
             ) or 0) / 10000
-            local amountInAuctionHouse = TSM_API.GetAuctionQuantity(AddOn
-              .generateItemString(item)) or 0
+            local amountInAuctionHouse = AddOn
+              .determineTotalAmountInAuctionHouse(item)
             local amountToPutIntoAuctionHouse = amountSoldPerDay *
               averageSoldPerDayMultiplier *
               window / 24

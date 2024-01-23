@@ -188,9 +188,10 @@ end
 --- @param item Item
 --- @return number
 function _.determineAuctionHousePrice(item)
+  local ahPrice
   if CraftAndSellInAH.auctionHousePriceSource == "TSM" then
     local itemString = AddOn.generateItemString(item)
-    local ahPrice = TSM_API.GetCustomPriceValue("DBRecent", itemString)
+    ahPrice = TSM_API.GetCustomPriceValue("DBRecent", itemString)
     if ahPrice == nil then
       ahPrice = TSM_API.GetCustomPriceValue("DBMarket", itemString)
     end
@@ -281,23 +282,22 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
       end
     end):selectTrue())
 
-  _.determineReagentSourcesForCrafts(
+  local extraItemsToCraft = _.determineReagentSourcesForCrafts(
     _.convertCraftingTasksMapToArray(craftingTasks),
     groups,
     inventory)
 
-  while groups[AddOn.SourceType.Crafting] and Array.hasElements(groups[AddOn.SourceType.Crafting]) do
+  while Array.hasElements(extraItemsToCraft) do
     --- @type { [RecipeID]: CraftingTask }
     local furtherCrafts = Object.fromEntries(
       Array.map(Object.entries(
           Array.groupBy(
             Array.map(
-              groups[AddOn.SourceType.Crafting],
+              extraItemsToCraft,
               function(thingToCraft)
-                local recipeID = CraftingSavedVariables.itemIDToRecipeID
-                  [thingToCraft.itemID]
                 return {
-                  recipeID = recipeID,
+                  recipeID = _.retrieveRecipeIDForItem(AddOn.createItem(
+                    thingToCraft.itemLink)),
                   amount = thingToCraft.amount,
                 }
               end
@@ -316,7 +316,7 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
             value = {
               recipeID = recipeID,
               amount = math.ceil(
-                Array.max(
+                Mathematics.sum(
                   Array.map(
                     thingsToCraft,
                     function(thingToCraft)
@@ -325,21 +325,21 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
                   )
                 ) / AddOn.determineAverageAmountProducedByRecipe(recipeData)
               ),
+              recipeData = recipeData,
             },
           }
         end)
     )
 
-    for recipeID, craft in pairs(furtherCrafts) do
+    for recipeID, craftingTask in pairs(furtherCrafts) do
       if craftingTasks[recipeID] then
         craftingTasks[recipeID].amount = craftingTasks[recipeID].amount +
-          craft.amount
+          craftingTask.amount
       else
-        craftingTasks[recipeID] = craft
+        craftingTasks[recipeID] = craftingTask
       end
     end
-    groups[AddOn.SourceType.Crafting] = nil
-    _.determineReagentSourcesForCrafts(
+    extraItemsToCraft = _.determineReagentSourcesForCrafts(
       _.convertCraftingTasksMapToArray(furtherCrafts),
       groups,
       inventory
@@ -388,6 +388,7 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
   return list, groupedThingsToCraft
 end
 
+-- TODO: Consider amount already in inventory for split.
 --- @param craftingTasks CraftingTask[]
 --- @return CraftingTask[]
 function _.sortByDependencyAndProfit(craftingTasks)
@@ -410,6 +411,23 @@ function _.sortByDependencyAndProfit(craftingTasks)
     end
   end
 
+  local a = function(craftingTask2, dependencies, amountRequired)
+    local averageAmountProduced = AddOn
+      .determineAverageAmountProducedByRecipe(craftingTask2.recipeData)
+    local totalAmountProduced = craftingTask2.amount *
+      averageAmountProduced
+    if totalAmountProduced > amountRequired then
+      local craftingTask3 = {
+        recipeID = craftingTask2.recipeID,
+        amount = math.ceil(amountRequired / averageAmountProduced),
+        recipeData = craftingTask2.recipeData,
+      }
+      craftingTask2.amount = craftingTask2.amount - craftingTask3.amount
+      craftingTask2 = craftingTask3
+    end
+    table.insert(dependencies, craftingTask2)
+  end
+
   --- @param craftingTask CraftingTask
   visitDependencies = function(craftingTask)
     local dependencies = {}
@@ -419,7 +437,8 @@ function _.sortByDependencyAndProfit(craftingTasks)
         local recipeID = _.retrieveRecipeIDForItem(reagent.items[1].item)
         local craftingTask2 = craftingTaskLookUp[recipeID]
         if craftingTask2 then
-          table.insert(dependencies, craftingTask2)
+          local amountRequired = craftingTask.amount * reagent.requiredQuantity
+          a(craftingTask2, dependencies, amountRequired)
         end
       end)
 
@@ -429,7 +448,8 @@ function _.sortByDependencyAndProfit(craftingTasks)
           local recipeID = _.retrieveRecipeIDForItem(reagent.activeReagent.item)
           local craftingTask2 = craftingTaskLookUp[recipeID]
           if craftingTask2 then
-            table.insert(dependencies, craftingTask2)
+            local amountRequired = craftingTask.amount
+            a(craftingTask2, dependencies, amountRequired)
           end
         end
       end)
@@ -440,7 +460,8 @@ function _.sortByDependencyAndProfit(craftingTasks)
           local recipeID = _.retrieveRecipeIDForItem(reagent.activeReagent.item)
           local craftingTask2 = craftingTaskLookUp[recipeID]
           if craftingTask2 then
-            table.insert(dependencies, craftingTask2)
+            local amountRequired = craftingTask.amount
+            a(craftingTask2, dependencies, amountRequired)
           end
         end
       end)
@@ -489,9 +510,6 @@ local engineeringStatSetterItems = Set.create({
 })
 
 function AddOn.determineRecipeData(recipeID)
-  --- @type CraftSim.RecipeData
-  local recipeData = CraftSim.RecipeData(recipeID, false, false)
-
   -- for index, slot in ipairs(recipeData.reagentData.optionalReagentSlots) do
   --   local itemID = slot.possibleReagents[1].item:GetItemID()
   --   if draconicMissivesForCraftingProfessions:contains(itemID) then
@@ -504,50 +522,65 @@ function AddOn.determineRecipeData(recipeID)
   -- end
   -- recipeData:SetOptionalReagent()
 
+  -- TODO: Ooey-Gooey Chocolate
+
+  local baseRecipeData = AddOn.determineBaseRecipeData(recipeID)
+
+  local variants = {
+    {
+      recipeData = baseRecipeData,
+      profit = baseRecipeData:GetAverageProfit(),
+    },
+  }
+
+  local itemIDs = {
+    197764,
+    197765,
+    -- 191526, -- TODO: Minimum profit threshold for when to craft with Lesser Illustrious Insight
+    -- TODO: Retrieve Lesser Illustrious Insight from breaking Illustrious Insight or by crafting Illustrious Insight and breaking it.
+  }
+
+  for index, slot in ipairs(baseRecipeData.reagentData.finishingReagentSlots) do
+    for index, itemID in ipairs(itemIDs) do
+      if Array.any(slot.possibleReagents, function(reagent)
+          return reagent.item:GetItemID() == itemID
+        end) then
+        local recipeData = AddOn.determineBaseRecipeData(recipeID)
+        recipeData:SetOptionalReagent(itemID)
+        recipeData:Update()
+        recipeData:OptimizeProfit()
+
+        local profit = recipeData:GetAverageProfit()
+
+        table.insert(variants, {
+          recipeData = recipeData,
+          profit = profit,
+        })
+      end
+    end
+  end
+
+  local maxVariantRecipeData = Array.max(variants, function(variant)
+    return variant.profit
+  end).recipeData
+
+  -- When the profession window for the profession is closed this might be set to false by CraftSim even though the recipe is learned.
+  -- We set it here to true so that CanCraft correctly works.
+  maxVariantRecipeData.learned = true
+
+  return maxVariantRecipeData
+end
+
+function AddOn.determineBaseRecipeData(recipeID)
+  --- @type CraftSim.RecipeData
+  local recipeData = CraftSim.RecipeData(recipeID, false, false)
+
   -- FIXME: With CraftSim freshly installed, this seems to throw an error. It seems required to open the profession window once to fix the error.
   recipeData:SetEquippedProfessionGearSet()
   if not recipeData.hasQualityReagents then
     recipeData:SetNonQualityReagentsMax()
   end
   recipeData:OptimizeProfit()
-  -- TODO: Ooey-Gooey Chocolate
-  for index, slot in ipairs(recipeData.reagentData.finishingReagentSlots) do
-    local variants = {
-      {
-        itemID = nil,
-        profit = recipeData:GetAverageProfit(),
-      },
-    }
-    local itemIDs = {
-      197764,
-      197765,
-    }
-    for index, itemID in ipairs(itemIDs) do
-      if Array.any(slot.possibleReagents, function(reagent)
-          return reagent.item:GetItemID() == itemID
-        end) then
-        recipeData:SetOptionalReagent(itemID)
-        recipeData:Update()
-        local profit = recipeData:GetAverageProfit()
-        slot.activeReagent = nil
-        recipeData:Update()
-        table.insert(variants, {
-          itemID = itemID,
-          profit = profit,
-        })
-      end
-    end
-    local maxVariant = Array.max(variants, function(variant)
-      return variant.profit
-    end)
-    if maxVariant.itemID then
-      recipeData:SetOptionalReagent(maxVariant.itemID)
-    end
-  end
-
-  -- When the profession window for the profession is closed this might be set to false by CraftSim even though the recipe is learned.
-  -- We set it here to true so that CanCraft correctly works.
-  recipeData.learned = true
 
   return recipeData
 end
@@ -916,8 +949,7 @@ function _.addItemToInventory(inventory, item)
   -- TODO: Maybe only consider the items for cancelling which are estimated to run out.
   -- if not inventory[AddOn.SourceType.AuctionHouseCancelling][itemLink] then
   --   local itemString = AddOn.generateItemString(item)
-  --   inventory[AddOn.SourceType.AuctionHouseCancelling][itemLink] = TSM_API
-  --     .GetAuctionQuantity(itemString)
+  --   inventory[AddOn.SourceType.AuctionHouseCancelling][itemLink] = AddOn.determineTotalAmountInAuctionHouse(item)
   -- end
 
   -- TODO: Other characters
@@ -930,6 +962,7 @@ end
 --- @param craftingTasks CraftingTask[]
 --- @param groups Groups
 --- @param inventory Inventory
+--- @return GroupEntry[]
 function _.determineReagentSourcesForCrafts(craftingTasks, groups, inventory)
   local thingsRequired = _.determineThingsRequiredForCraftingTasks(
     craftingTasks)
@@ -938,6 +971,7 @@ function _.determineReagentSourcesForCrafts(craftingTasks, groups, inventory)
     _.addItemToInventory(inventory, AddOn.createItem(thingRequired.itemLink))
   end)
 
+  local extraCraftingTasks = {}
 
   Array.forEach(thingsRequired, function(thingRequired)
     local bestSources = AddOn.determineBestSourcesForThing(inventory,
@@ -959,9 +993,14 @@ function _.determineReagentSourcesForCrafts(craftingTasks, groups, inventory)
         else
           groups[source][itemLink] = Object.copy(entry)
         end
+        if source == AddOn.SourceType.Crafting then
+          table.insert(extraCraftingTasks, Object.copy(entry))
+        end
       end)
     end
   end)
+
+  return extraCraftingTasks
 end
 
 --- @param craftingTasks CraftingTask[]
@@ -1236,8 +1275,7 @@ function AddOn.determineTotalInventoryAmount(item)
   return GetItemCount(item:GetItemLink(), true, nil, true) +
     TSM_API.GetMailQuantity(
       itemString) + TSM_API.GetGuildQuantity(
-      itemString) + TSM_API
-    .GetAuctionQuantity(itemString)
+      itemString) + AddOn.determineTotalAmountInAuctionHouse(item)
 end
 
 --- @param item Item
@@ -1403,7 +1441,14 @@ end
 --- @param recipeData CraftSim.RecipeData
 --- @return Amount
 function AddOn.determineAverageAmountProducedByRecipe(recipeData)
-  return select(1, CraftSim.CALC:GetExpectedItemAmountMulticraft(recipeData))
+  local averageAmountOfExtraItemsFromMulticraft = select(2,
+    CraftSim.CALC:GetExpectedItemAmountMulticraft(recipeData))
+  local amount = recipeData.baseItemAmount
+  if recipeData.supportsMulticraft then
+    amount = amount + recipeData.professionStats.multicraft:GetPercent(true) *
+      averageAmountOfExtraItemsFromMulticraft
+  end
+  return amount
 end
 
 --- @param inventory Inventory
@@ -1420,7 +1465,7 @@ function _.retrieveFromInventory(inventory, itemLink, amount)
     AddOn.SourceType.Mail,
     AddOn.SourceType.GuildBank,
     AddOn.SourceType.OtherCharacter,
-    AddOn.SourceType.AuctionHouseCancelling,
+    -- AddOn.SourceType.AuctionHouseCancelling,
   }
 
   --- @type Retrieval
@@ -1578,4 +1623,14 @@ end
 --- @param item Item
 function AddOn.determineAuctionHouseBuyPrice(item)
   return _.determineAuctionHousePrice(item)
+end
+
+--- @player item Item
+--- @return integer
+function AddOn.determineTotalAmountInAuctionHouse(item)
+  local amountInAuctionHouseByCurrentCharacter, amountInAuctionHouseByOtherCharacters =
+    select(3, TSM_API.GetPlayerTotals(AddOn
+      .generateItemString(item)))
+  return amountInAuctionHouseByCurrentCharacter +
+    amountInAuctionHouseByOtherCharacters
 end
