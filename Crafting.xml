@@ -1,0 +1,109 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\..\FrameXML\UI.xsd">
+  <Script file="Crafting.lua" />
+
+  <Button name="CraftingTabTemplate" frameStrata="LOW" parent="UIParent" virtual="true" inherits="ChatTabArtTemplate" parentArray="CraftingTabs">
+    <Anchors>
+      <Anchor point="BOTTOMLEFT" x="0" y="2" />
+    </Anchors>
+    <Scripts>
+      <OnLoad>
+        self:SetAlpha(0.6)
+        self:RegisterForDrag("LeftButton")
+      </OnLoad>
+      <OnDragStart>
+        local craftingFrame = _G["CraftingFrame" .. self:GetID()]
+        craftingFrame:StartMoving()
+        self.dragButton = button
+        self:SetScript("OnUpdate", CraftingTab_OnUpdate)
+      </OnDragStart>
+    </Scripts>
+    <ButtonText parentKey="Text">
+      <Size x="50" y="8" />
+      <Anchors>
+        <Anchor point="CENTER" x="0" y="-5" />
+      </Anchors>
+    </ButtonText>
+    <NormalFont style="GameFontNormalSmall" />
+  </Button>
+
+  <ScrollingMessageFrame name="CraftingFrameTemplate" movable="true" resizable="true" toplevel="true" inherits="FloatingBorderedFrame" parent="UIParent" hidden="false" clampedToScreen="true" frameLevel="5" virtual="true">
+    <Size x="430" y="120" />
+    <Anchors>
+      <Anchor point="BOTTOMRIGHT" x="-10" y="200" />
+    </Anchors>
+    <ResizeBounds>
+      <minResize>
+        <AbsDimension x="250" y="120" />
+      </minResize>
+    </ResizeBounds>
+    <Frames>
+      <EventFrame parentKey="ScrollBar" inherits="MinimalScrollBar">
+        <Anchors>
+          <Anchor point="TOPRIGHT" />
+          <Anchor point="BOTTOMRIGHT" />
+        </Anchors>
+      </EventFrame>
+      <Button name="$parentResizeButton" parentKey="ResizeButton">
+        <Size x="16" y="16" />
+        <Anchors>
+          <Anchor point="BOTTOMRIGHT" relativeTo="$parentBackground" x="0" y="0" />
+        </Anchors>
+        <Scripts>
+          <OnMouseDown>
+            self:SetButtonState("PUSHED", true)
+            self:GetHighlightTexture():Hide()
+            self:GetParent():StartSizing("BOTTOMRIGHT")
+          </OnMouseDown>
+          <OnMouseUp>
+            self:SetButtonState("NORMAL", false)
+            self:GetHighlightTexture():Show()
+            self:GetParent():StopMovingOrSizing()
+          </OnMouseUp>
+        </Scripts>
+        <NormalTexture file="Interface\ChatFrame\UI-ChatIM-SizeGrabber-Up" />
+        <HighlightTexture file="Interface\ChatFrame\UI-ChatIM-SizeGrabber-Highlight" />
+        <PushedTexture file="Interface\ChatFrame\UI-ChatIM-SizeGrabber-Down" />
+      </Button>
+      <Frame name="$parentButtonFrame" inherits="FloatingBorderedFrame" parentKey="buttonFrame" alpha="0.2">
+        <Size x="29" y="0" />
+        <Frames>
+          <Button name="$parentMinimizeButton" parentKey="minimizeButton">
+            <Size x="32" y="32" />
+            <Anchors>
+              <Anchor point="TOP" x="0" y="4" />
+            </Anchors>
+            <Scripts>
+              <OnClick>
+                local frame = self:GetParent():GetParent()
+                CraftingFrame_MinimizeFrame(frame, strupper(frame.buttonSide))
+              </OnClick>
+            </Scripts>
+            <NormalTexture file="Interface\ChatFrame\UI-ChatIcon-Minimize-Up" />
+            <PushedTexture file="Interface\ChatFrame\UI-ChatIcon-Minimize-Down" />
+            <HighlightTexture file="Interface\Buttons\UI-Common-MouseHilight" alphaMode="ADD" />
+          </Button>
+        </Frames>
+      </Frame>
+    </Frames>
+    <Scripts>
+      <OnLoad>
+        CraftingFrame_OnLoad(self)
+      </OnLoad>
+    </Scripts>
+  </ScrollingMessageFrame>
+
+  <Button name="CraftingFrame1Tab" inherits="CraftingTabTemplate" id="1" />
+  <ScrollingMessageFrame name="CraftingFrame1" id="1" inherits="CraftingFrameTemplate">
+    <KeyValues>
+      <KeyValue key="title" value="What items are planned to be crafted" type="string" />
+    </KeyValues>
+  </ScrollingMessageFrame>
+
+  <Button name="CraftingFrame2Tab" inherits="CraftingTabTemplate" id="2" />
+  <ScrollingMessageFrame name="CraftingFrame2" id="2" inherits="CraftingFrameTemplate">
+    <KeyValues>
+      <KeyValue key="title" value="Plan" type="string" />
+    </KeyValues>
+  </ScrollingMessageFrame>
+</Ui>

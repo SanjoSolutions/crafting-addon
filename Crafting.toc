@@ -20,5 +20,6 @@ node_modules\@sanjo-addons\object\Object.xml
 node_modules\@sanjo-addons\set\Set.xml
 node_modules\@sanjo-addons\string\String.xml
 
+Crafting.xml
 CraftAndSellInAH.lua
 Plan.lua

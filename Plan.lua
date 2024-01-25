@@ -21,8 +21,8 @@ local CraftSim = CraftSim_DEBUG:RUN()
 
 local craftingPage = ProfessionsFrame.CraftingPage
 
-local inputDisplay = ChatFrame4
-local planDisplay = ChatFrame5
+local inputDisplay = CraftingFrame1
+local planDisplay = CraftingFrame2
 inputDisplay:SetMaxLines(5000)
 planDisplay:SetMaxLines(5000)
 
