@@ -345,6 +345,7 @@ function AddOn.determineThingsToRetrieve(thingsToCraft)
       inventory
     )
   end
+  groups[AddOn.SourceType.Crafting] = nil
 
   --- @type ThingsToRetrieveStepsList
   local list = {}
