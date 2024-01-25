@@ -12,8 +12,6 @@ Highly automated and optimized crafting and selling of the crafted items.
 
 ## How to use
 
-In version 0.3.1 and before: The addon requires two additional chat windows. They can be created by right-clicking on "General" at the chat frame and selecting "Create New Window". Do this two times.
-
 The add-on currently uses Auctionator as price source. It also requires TradeSkillMaster and CraftSim. If all those dependencies are installed, then the add-on can be used.
 
 ### Crafting and selling routine
