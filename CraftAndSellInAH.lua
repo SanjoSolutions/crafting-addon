@@ -1393,12 +1393,14 @@ function _.showText(text)
 end
 
 function AddOn.showText(chatFrame, text)
+  local scrollOffset = chatFrame:GetScrollOffset()
   chatFrame:Clear()
 
   local lines = String.split("\n", text)
   Array.forEach(lines, function(line)
     chatFrame:AddMessage(line)
   end)
+  chatFrame:SetScrollOffset(scrollOffset)
 end
 
 -- TODO: Sagacious Incense buff (+20 inspiration) when it makes a difference

@@ -163,7 +163,7 @@ function _.SetWindowColor(frame)
 end
 
 function _.SetWindowAlpha(frame)
-  local alpha = 0.25
+  local alpha = 1
   local name = frame:GetName()
   for index, value in pairs(_.CRAFTING_FRAME_TEXTURES) do
     _G[name .. value]:SetAlpha(alpha)
