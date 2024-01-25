@@ -1,8 +1,7 @@
 ## Title: Crafting
 ## Version: 0.4.0
 ## Interface: 100200
-## Dependencies: TradeSkillMaster, CraftSim, Blizzard_AuctionHouseUI
-## OptionalDeps: Auctionator
+## Dependencies: Auctionator, TradeSkillMaster, CraftSim, Blizzard_AuctionHouseUI
 ## SavedVariables: CraftingSavedVariables
 ## SavedVariablesPerCharacter: CraftingSavedVariablesPerCharacter
 
