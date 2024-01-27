@@ -12,7 +12,13 @@ Highly automated and optimized crafting and selling of the crafted items.
 
 ## How to use
 
-The add-on currently uses Auctionator as price source. It also requires TradeSkillMaster and CraftSim. If all those dependencies are installed, then the add-on can be used.
+### Dependencies
+
+This add-on requires other add-ons to be installed and enabled.
+
+* Auctionator
+* TradeSkillMaster
+* CraftSim (tested with version 14.3.0)
 
 ### Crafting and selling routine
 
