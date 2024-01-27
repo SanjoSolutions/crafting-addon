@@ -525,7 +525,7 @@ function AddOn.determineRecipeData(recipeID)
 
   -- TODO: Ooey-Gooey Chocolate
 
-  local baseRecipeData = AddOn.determineBaseRecipeData(recipeID)
+  local baseRecipeData = _.determineBaseRecipeData(recipeID)
 
   local variants = {
     {
@@ -546,7 +546,7 @@ function AddOn.determineRecipeData(recipeID)
       if Array.any(slot.possibleReagents, function(reagent)
           return reagent.item:GetItemID() == itemID
         end) then
-        local recipeData = AddOn.determineBaseRecipeData(recipeID)
+        local recipeData = _.determineBaseRecipeData(recipeID)
         recipeData:SetOptionalReagent(itemID)
         recipeData:Update()
         recipeData:OptimizeProfit()
@@ -572,12 +572,10 @@ function AddOn.determineRecipeData(recipeID)
   return maxVariantRecipeData
 end
 
-function AddOn.determineBaseRecipeData(recipeID)
+function _.determineBaseRecipeData(recipeID)
   --- @type CraftSim.RecipeData
   local recipeData = CraftSim.RecipeData(recipeID, false, false)
 
-  -- FIXME: With CraftSim freshly installed, this seems to throw an error. It seems required to open the profession window once to fix the error.
-  recipeData:SetEquippedProfessionGearSet()
   if not recipeData.hasQualityReagents then
     recipeData:SetNonQualityReagentsMax()
   end
@@ -1173,8 +1171,15 @@ end
 
 local retrieveRecipeInfo = C_TradeSkillUI.GetRecipeInfo
 C_TradeSkillUI.GetRecipeInfo = function(recipeID, recipeLevel)
-  return retrieveRecipeInfo(recipeID, recipeLevel) or
-    _.retrieveCachedRecipeInfo(recipeID)
+  local recipeInfo1 = retrieveRecipeInfo(recipeID, recipeLevel)
+  local recipeInfo2 = _.retrieveCachedRecipeInfo(recipeID)
+  local recipeInfo
+  if recipeInfo1 and recipeInfo1.categoryID ~= 0 then
+    recipeInfo = recipeInfo1
+  else
+    recipeInfo = recipeInfo2
+  end
+  return recipeInfo
 end
 
 function _.retrieveCraftedItemIDs(recipeID)
@@ -1403,29 +1408,36 @@ function AddOn.showText(chatFrame, text)
   chatFrame:SetScrollOffset(scrollOffset)
 end
 
--- TODO: Sagacious Incense buff (+20 inspiration) when it makes a difference
 --- @param item Item
 function _.determineCraftingCost(item)
   local recipeID = _.retrieveRecipeIDForItem(item)
   if recipeID then
     local recipeData = AddOn.determineRecipeData(recipeID)
-    if recipeData.supportsQualities then
-      local quality = Array.findIndex(recipeData.resultData.itemsByQuality,
-        function(item2)
-          return item2:GetItemLink() == item:GetItemLink()
-        end)
-      if quality and recipeData.resultData.chanceByQuality[quality] == 1 then
-        return recipeData.priceData.craftingCosts /
-          AddOn.determineAverageAmountProducedByRecipe(recipeData)
-      else
-        return nil
-      end
-    else
-      return recipeData.priceData.craftingCosts /
-        AddOn.determineAverageAmountProducedByRecipe(recipeData)
-    end
+    return _.determineCraftingCostForRecipe(recipeData, item)
   else
     return nil
+  end
+end
+
+-- TODO: Sagacious Incense buff (+20 inspiration) when it makes a difference
+--- @param recipeData CraftSim.RecipeData
+--- @param item Item
+--- @return Money|nil
+function _.determineCraftingCostForRecipe(recipeData, item)
+  if recipeData.supportsQualities then
+    local quality = Array.findIndex(recipeData.resultData.itemsByQuality,
+      function(item2)
+        return item2:GetItemLink() == item:GetItemLink()
+      end)
+    if quality and recipeData.resultData.chanceByQuality[quality] == 1 then
+      return recipeData.priceData.craftingCosts /
+        AddOn.determineAverageAmountProducedByRecipe(recipeData)
+    else
+      return nil
+    end
+  else
+    return recipeData.priceData.craftingCosts /
+      AddOn.determineAverageAmountProducedByRecipe(recipeData)
   end
 end
 
@@ -1533,7 +1545,19 @@ function AddOn.determineBestSourcesForThing(inventory, thing)
   if amountLeft >= 1 then
     local npcBuyPrice = _.determineNPCBuyPrice(item)
     -- TODO: Craft if crafting results in a higher quality for a lower price than buying the specified quality from AH.
-    local craftingPrice = _.determineCraftingCost(item)
+    local recipe = AddOn.retrieveRecipeForItem(item)
+    local recipeData
+    if recipe then
+      recipeData = AddOn.determineRecipeData(recipe.recipeID)
+    else
+      recipeData = nil
+    end
+    local craftingPrice
+    if recipeData then
+      craftingPrice = _.determineCraftingCostForRecipe(recipeData, item)
+    else
+      craftingPrice = nil
+    end
     local auctionHouseBuyPrice = AddOn.determineAuctionHouseBuyPrice(item)
     local sources = {}
     if npcBuyPrice then
@@ -1542,7 +1566,7 @@ function AddOn.determineBestSourcesForThing(inventory, thing)
         price = npcBuyPrice,
       })
     end
-    if craftingPrice then
+    if craftingPrice and recipeData and recipeData:GetAverageProfit() >= AddOn.MINIMUM_PROFIT_PER_CRAFT then
       table.insert(sources, {
         type = AddOn.SourceType.Crafting,
         price = craftingPrice,

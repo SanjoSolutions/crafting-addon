@@ -3,6 +3,12 @@ local addOnName = select(1, ...)
 local AddOn = select(2, ...)
 local _ = {}
 
+AddOn.USUAL_CRAFTING_TIME = 0.5 -- seconds
+AddOn.MINIMUM_PROFIT_PER_HOUR = 10000000 / 3 * 60
+AddOn.MINIMUM_PROFIT_PER_CRAFT = AddOn.MINIMUM_PROFIT_PER_HOUR /
+  (AddOn
+    .USUAL_CRAFTING_TIME * 60 * 60) -- TODO: Consider the different crafting times for different recipes.
+
 --- @type Array
 local Array = Library.retrieve("Array", "^2.1.1")
 --- @type Boolean
@@ -175,7 +181,7 @@ function _.findRecipesToCraft()
         if recipeData and not Array.any(C_TradeSkillUI.GetRecipeRequirements(recipeData.recipeID), function(
             requirement)
             return requirement.name == "Earth-Warder's Forge"
-          end) and recipeData:GetAverageProfit() > 0 then
+          end) and recipeData:GetAverageProfit() >= AddOn.MINIMUM_PROFIT_PER_CRAFT then
           local window = 1 -- hour
           local averageSoldPerDayMultiplier = 1 -- to account for that the stat has been derived from TSM users and that some players might not use TSM.
           if recipeData.supportsQualities then
