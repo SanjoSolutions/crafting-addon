@@ -867,13 +867,6 @@ function _.retrieveLowestBuyoutAmountResult(itemKey)
   return nil
 end
 
-do
-  -- FIXME
-  BINDING_HEADER_MONEY_MAKING = "Money Making"
-  local prefix = "Money Making: "
-  BINDING_NAME_MONEY_MAKING_CONFIRM_BUTTON = prefix .. "Confirm"
-end
-
 CraftAndSellInAH.thread = nil
 
 local confirmButton = CreateFrame("Button", nil, UIParent,

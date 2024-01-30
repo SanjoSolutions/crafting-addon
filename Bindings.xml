@@ -1,7 +1,7 @@
 <Bindings>
-  <Binding name="MONEY_MAKING_CONFIRM_BUTTON" runOnUp="true" category="ADDONS" header="MONEY_MAKING">
+  <Binding name="CRAFTING_CONFIRM_BUTTON" runOnUp="true" category="ADDONS" header="CRAFTING">
     if keystate == 'down' then
-      MoneyMaking.confirm()
+      CraftAndSellInAH.confirm()
     end
   </Binding>
 </Bindings>

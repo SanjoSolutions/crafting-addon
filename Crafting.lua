@@ -1,5 +1,11 @@
 local _ = {}
 
+do
+  BINDING_HEADER_CRAFTING = "Crafting"
+  local prefix = "Crafting: "
+  BINDING_NAME_CRAFTING_CONFIRM_BUTTON = prefix .. "Confirm"
+end
+
 function CraftingTab_OnUpdate(self)
   local cursorX, cursorY = GetCursorPosition()
   cursorX = cursorX / UIParent:GetScale()
