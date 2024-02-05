@@ -4,7 +4,7 @@ local AddOn = select(2, ...)
 local _ = {}
 
 AddOn.USUAL_CRAFTING_TIME = 0.5 -- seconds
-AddOn.MINIMUM_PROFIT_PER_HOUR = 10000000 / 3 * 60
+AddOn.MINIMUM_PROFIT_PER_HOUR = 5000000 / 3 * 60
 AddOn.MINIMUM_PROFIT_PER_CRAFT = AddOn.MINIMUM_PROFIT_PER_HOUR /
   (AddOn
     .USUAL_CRAFTING_TIME * 60 * 60) -- TODO: Consider the different crafting times for different recipes.
@@ -175,7 +175,7 @@ function _.findRecipesToCraft()
 
   Array.forEach(Object.values(CraftingSavedVariablesPerCharacter.recipes),
     function(recipe)
-      if recipe.recipeInfo.learned and recipe.recipeID ~= 381417 then
+      if recipe.recipeInfo.learned and recipe.recipeID ~= 381417 and not AddOn.isTransmuteRecipe(recipe) then
         local recipeData = AddOn.determineRecipeData(recipe.recipeID)
 
         if recipeData and not Array.any(C_TradeSkillUI.GetRecipeRequirements(recipeData.recipeID), function(
@@ -257,6 +257,10 @@ function _.findRecipesToCraft()
       end
     end)
   _.update()
+end
+
+function AddOn.isTransmuteRecipe(recipe)
+  return recipe.profession == 3 and recipe.categoryID == 1604
 end
 
 AddOn.retrieveProfessions = function()

@@ -751,7 +751,7 @@ function _.doSellTask(sellTask)
         print("Trying to put in " ..
           amount ..
           " x " .. itemLink .. " (each for " .. GetMoneyString(unitPrice) .. ").")
-        if MoneyMakingAssistant.showConfirmButton() then
+        if CraftAndSellInAH.showConfirmButton() then
           local errorCode = nil
           local listener
           listener = Events.listenForEvent("AUCTION_HOUSE_SHOW_ERROR",
@@ -1540,7 +1540,7 @@ function AddOn.determineBestSourcesForThing(inventory, thing)
     -- TODO: Craft if crafting results in a higher quality for a lower price than buying the specified quality from AH.
     local recipe = AddOn.retrieveRecipeForItem(item)
     local recipeData
-    if recipe then
+    if recipe and not AddOn.isTransmuteRecipe(recipe) then
       recipeData = AddOn.determineRecipeData(recipe.recipeID)
     else
       recipeData = nil
@@ -1629,7 +1629,7 @@ local npcPrices = {
   [194691] = 25000 / 5,
   -- Other
   [190452] = 150000,
-  [191474] = 50000,
+  [191474] = 10000,
 }
 
 function _.determineNPCBuyPrice(item)
