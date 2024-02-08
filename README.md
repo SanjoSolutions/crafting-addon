@@ -18,7 +18,7 @@ This add-on requires other add-ons to be installed and enabled.
 
 * Auctionator
 * TradeSkillMaster
-* CraftSim (tested with version 14.3.0)
+* CraftSim (tested with version 14.4.1)
 
 ### Crafting and selling routine
 
