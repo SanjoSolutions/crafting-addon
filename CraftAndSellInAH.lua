@@ -9,6 +9,16 @@ local AddOn = select(2, ...)
 --- @class _
 local _ = {}
 
+AddOn.retrieveCraftSim = function()
+  if CraftSim_DEBUG and CraftSim_DEBUG.RUN then
+    return CraftSim_DEBUG:RUN()
+  elseif CraftSimAPI and CraftSimAPI.GetCraftSim then
+    return CraftSimAPI:GetCraftSim()
+  else
+    error("A reference to CraftSim could not be retrieved.")
+  end
+end
+
 --- @type Array
 local Array = Library.retrieve("Array", "^2.1.1")
 --- @type Bags
