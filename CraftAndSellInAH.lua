@@ -25,7 +25,7 @@ local Object = Library.retrieve("Object", "^1.1.1")
 local Set = Library.retrieve("Set", "^1.1.2")
 --- @type String
 local String = Library.retrieve("String", "^2.0.1")
-local CraftSim = CraftSim_DEBUG:RUN()
+local CraftSim = AddOn.retrieveCraftSim()
 
 --- @alias Item ItemMixin
 

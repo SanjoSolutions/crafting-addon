@@ -9,6 +9,16 @@ AddOn.MINIMUM_PROFIT_PER_CRAFT = AddOn.MINIMUM_PROFIT_PER_HOUR /
   (AddOn
     .USUAL_CRAFTING_TIME * 60 * 60) -- TODO: Consider the different crafting times for different recipes.
 
+AddOn.retrieveCraftSim = function()
+  if CraftSim_DEBUG and CraftSim_DEBUG.RUN then
+    return CraftSim_DEBUG:RUN()
+  elseif CraftSimAPI and CraftSimAPI.GetCraftSim then
+    return CraftSimAPI:GetCraftSim()
+  else
+    error("A reference to CraftSim could not be retrieved.")
+  end
+end
+
 --- @type Array
 local Array = Library.retrieve("Array", "^2.1.1")
 --- @type Boolean
@@ -23,7 +33,7 @@ local Mathematics = Library.retrieve("Mathematics", "^2.0.1")
 local Object = Library.retrieve("Object", "^1.1.1")
 --- @type Set
 local Set = Library.retrieve("Set", "^1.1.2")
-local CraftSim = CraftSim_DEBUG:RUN()
+local CraftSim = AddOn.retrieveCraftSim()
 
 local craftingPage = ProfessionsFrame.CraftingPage
 
