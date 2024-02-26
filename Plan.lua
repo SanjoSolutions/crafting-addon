@@ -433,13 +433,13 @@ function _.initializeSavedVariables()
   if not CraftingSavedVariables.professions then
     CraftingSavedVariables.professions = {}
   end
-  if not CraftingSavedVariablesPerCharacter.recipes then
-    CraftingSavedVariablesPerCharacter.recipes = {}
-  end
 
   if not CraftingSavedVariablesPerCharacter then
     CraftingSavedVariablesPerCharacter = {}
   end
+  if not CraftingSavedVariablesPerCharacter.recipes then
+    CraftingSavedVariablesPerCharacter.recipes = {}
+  end  
   if not CraftingSavedVariablesPerCharacter.plan then
     --- @type ThingToCraft[]
     CraftingSavedVariablesPerCharacter.plan = {}
